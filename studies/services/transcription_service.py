@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -104,7 +105,8 @@ def _transcribe_complete_with_configured_provider(uploaded_file, *, suffix: str)
         always_chunk = str(getattr(settings, 'TRANSCRIPTION_ALWAYS_CHUNK', 'false')).lower() in {'1', 'true', 'yes', 'sim'}
 
         file_size_mb = source_path.stat().st_size / (1024 * 1024)
-        has_ffmpeg = _has_binary('ffmpeg') and _has_binary('ffprobe')
+        ffmpeg_path = _ffmpeg_binary()
+        has_ffmpeg = bool(ffmpeg_path)
         duration = _media_duration_seconds(source_path) if has_ffmpeg else None
 
         # Para arquivos maiores/longos, ffmpeg é obrigatório para evitar cortes silenciosos.
@@ -164,20 +166,73 @@ def _has_binary(name: str) -> bool:
     return shutil.which(name) is not None
 
 
-def _media_duration_seconds(path: Path) -> float | None:
+def _ffmpeg_binary() -> str | None:
+    """Retorna um ffmpeg disponível no sistema ou o binário empacotado pelo Python.
+
+    Em serviços cloud como Render, o ffmpeg do sistema pode não estar instalado.
+    O pacote imageio-ffmpeg baixa/fornece um binário funcional no ambiente Python,
+    evitando erro 500 durante transcrições longas que precisam ser divididas.
+    """
+    configured = str(getattr(settings, 'FFMPEG_BINARY', '') or '').strip()
+    if configured:
+        return configured
+
+    system_path = shutil.which('ffmpeg')
+    if system_path:
+        return system_path
+
     try:
+        import imageio_ffmpeg
+
+        bundled = imageio_ffmpeg.get_ffmpeg_exe()
+        return bundled if bundled else None
+    except Exception:
+        return None
+
+
+def _ffprobe_binary() -> str | None:
+    configured = str(getattr(settings, 'FFPROBE_BINARY', '') or '').strip()
+    if configured:
+        return configured
+    return shutil.which('ffprobe')
+
+
+def _media_duration_seconds(path: Path) -> float | None:
+    ffprobe = _ffprobe_binary()
+    if ffprobe:
+        try:
+            result = subprocess.run(
+                [
+                    ffprobe, '-v', 'error', '-show_entries', 'format=duration',
+                    '-of', 'default=noprint_wrappers=1:nokey=1', str(path)
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            value = result.stdout.strip()
+            return float(value) if value else None
+        except Exception:
+            pass
+
+    ffmpeg = _ffmpeg_binary()
+    if not ffmpeg:
+        return None
+    try:
+        # ffmpeg mostra a duração no stderr quando chamado apenas para inspecionar o arquivo.
         result = subprocess.run(
-            [
-                'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
-                '-of', 'default=noprint_wrappers=1:nokey=1', str(path)
-            ],
-            check=True,
+            [ffmpeg, '-i', str(path), '-f', 'null', '-'],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=90,
         )
-        value = result.stdout.strip()
-        return float(value) if value else None
+        combined = f'{result.stdout}\n{result.stderr}'
+        match = re.search(r'Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)', combined)
+        if not match:
+            return None
+        hours, minutes, seconds = match.groups()
+        return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
     except Exception:
         return None
 
@@ -245,7 +300,10 @@ def _chunk_start_second(index: int, chunk_seconds: int, overlap_seconds: int) ->
 
 
 def _convert_audio_slice(source_path: Path, output_path: Path, *, start: float | None, duration: float | None) -> None:
-    command = ['ffmpeg', '-y']
+    ffmpeg = _ffmpeg_binary()
+    if not ffmpeg:
+        raise RuntimeError('ffmpeg não está disponível no servidor para dividir/converter o áudio.')
+    command = [ffmpeg, '-y']
     if start is not None:
         command.extend(['-ss', f'{start:.3f}'])
     command.extend(['-i', str(source_path)])

@@ -243,47 +243,51 @@ def transcriptions(request):
         if form.is_valid():
             data = form.cleaned_data
             uploaded = data['file']
-            raw_text = transcribe_uploaded_file(uploaded, title=data['title'], subject=data.get('subject') or '', area=data['area'])
-            professor_text = _extract_transcript_only(raw_text)
-            status = 'demonstrativa' if is_demo_transcription(raw_text) else 'concluida'
-            summary_text = ai_generate_summary(
-                area=data['area'],
-                title=f"Resumo — {data['title']}",
-                subject=data.get('subject') or '',
-                input_text=professor_text,
-                summary_type='completo',
-                level='intermediario',
-            )
             try:
-                uploaded.seek(0)
-            except Exception:
-                pass
-            transcript = Transcript.objects.create(
-                user=request.user,
-                title=data['title'],
-                area=data['area'],
-                subject=data.get('subject') or '',
-                source_file=uploaded,
-                raw_text=raw_text,
-                professor_text=professor_text,
-                summary_text=summary_text,
-                folder=data.get('folder'),
-                status=status,
-            )
-            _create_library_item(
-                user=request.user,
-                title=transcript.title,
-                material_type='transcricao',
-                area=transcript.area,
-                subject=transcript.subject,
-                content=transcript.transcript_only,
-                folder=transcript.folder,
-                object_id=transcript.id,
-            )
-            if status == 'demonstrativa':
-                messages.warning(request, 'Modo demonstrativo: esta não é a transcrição completa da aula. Configure OPENAI_API_KEY ou GROQ_API_KEY no .env e, para aulas longas, instale ffmpeg com: brew install ffmpeg.')
-            else:
-                messages.success(request, 'Transcrição concluída. A fala do professor e o resumo da aula foram separados.')
+                raw_text = transcribe_uploaded_file(uploaded, title=data['title'], subject=data.get('subject') or '', area=data['area'])
+                professor_text = _extract_transcript_only(raw_text)
+                status = 'demonstrativa' if is_demo_transcription(raw_text) else 'concluida'
+                summary_text = ai_generate_summary(
+                    area=data['area'],
+                    title=f"Resumo — {data['title']}",
+                    subject=data.get('subject') or '',
+                    input_text=professor_text,
+                    summary_type='completo',
+                    level='intermediario',
+                )
+                try:
+                    uploaded.seek(0)
+                except Exception:
+                    pass
+                transcript = Transcript.objects.create(
+                    user=request.user,
+                    title=data['title'],
+                    area=data['area'],
+                    subject=data.get('subject') or '',
+                    source_file=uploaded,
+                    raw_text=raw_text,
+                    professor_text=professor_text,
+                    summary_text=summary_text,
+                    folder=data.get('folder'),
+                    status=status,
+                )
+                _create_library_item(
+                    user=request.user,
+                    title=transcript.title,
+                    material_type='transcricao',
+                    area=transcript.area,
+                    subject=transcript.subject,
+                    content=transcript.transcript_only,
+                    folder=transcript.folder,
+                    object_id=transcript.id,
+                )
+                if status == 'demonstrativa':
+                    messages.warning(request, 'Modo demonstrativo: esta não é a transcrição completa da aula. Confira GROQ_API_KEY/OPENAI_API_KEY no Render e tente novamente.')
+                else:
+                    messages.success(request, 'Transcrição concluída. A fala do professor e o resumo da aula foram separados.')
+            except Exception as exc:
+                messages.error(request, f'Deu erro ao transcrever. Detalhe técnico: {exc}')
+                return redirect('studies:transcriptions')
         else:
             messages.error(request, 'Revise o formulário de transcrição.')
     else:
