@@ -10,6 +10,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+import requests
 from django.conf import settings
 
 
@@ -46,36 +47,51 @@ def _is_error_result(text: str | None) -> bool:
 
 
 def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
-    """Chama o provedor configurado.
+    """Chama OpenAI/Groq sem usar o SDK oficial.
 
-    O nome foi mantido para compatibilidade interna, mas a função agora aceita
-    OpenAI e GroqCloud por meio do cliente OpenAI-compatible.
+    A versão anterior usava ``openai.OpenAI``. Em alguns deploys do Render,
+    combinações de versões do OpenAI SDK e httpx geravam o erro
+    ``Client.__init__() got an unexpected keyword argument 'proxies'``.
+    Aqui usamos HTTP direto para evitar esse problema e garantir que resumo,
+    questões e demais materiais usem a IA real configurada.
     """
     if not has_configured_ai():
         return None
+
+    provider = getattr(settings, 'AI_PROVIDER', 'openai').lower()
+    if provider == 'groq':
+        api_key = (getattr(settings, 'GROQ_API_KEY', '') or getattr(settings, 'OPENAI_API_KEY', '')).strip()
+        base_url = 'https://api.groq.com/openai/v1'
+        model = getattr(settings, 'GROQ_MODEL', 'llama-3.1-8b-instant')
+    else:
+        api_key = getattr(settings, 'OPENAI_API_KEY', '').strip()
+        base_url = 'https://api.openai.com/v1'
+        model = getattr(settings, 'OPENAI_MODEL', 'gpt-4o-mini')
+
+    payload = {
+        'model': model,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_prompt},
+        ],
+        'temperature': 0.25,
+    }
     try:
-        from openai import OpenAI
-
-        provider = getattr(settings, 'AI_PROVIDER', 'openai').lower()
-        if provider == 'groq':
-            api_key = (getattr(settings, 'GROQ_API_KEY', '') or getattr(settings, 'OPENAI_API_KEY', '')).strip()
-            client = OpenAI(api_key=api_key, base_url='https://api.groq.com/openai/v1')
-            model = getattr(settings, 'GROQ_MODEL', 'llama-3.1-8b-instant')
-        else:
-            client = OpenAI(api_key=settings.OPENAI_API_KEY)
-            model = getattr(settings, 'OPENAI_MODEL', 'gpt-4o-mini')
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': user_prompt},
-            ],
-            temperature=0.35,
+        response = requests.post(
+            f'{base_url}/chat/completions',
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+            json=payload,
+            timeout=180,
         )
-        return response.choices[0].message.content or ''
+        if response.status_code >= 400:
+            return f'[[IA indisponível em {_provider_label()}: HTTP {response.status_code} - {response.text[:600]}]]'
+        data = response.json()
+        return data.get('choices', [{}])[0].get('message', {}).get('content', '') or ''
     except Exception as exc:
-        return f'[[IA indisponível em {_provider_label()}: {exc}]]\n\n{_fallback_notice()}'
+        return f'[[IA indisponível em {_provider_label()}: {exc}]]'
 
 
 def _fallback_notice() -> str:
@@ -105,26 +121,37 @@ def _base_system_prompt(area: str) -> str:
 
 def generate_summary(*, area: str, title: str, subject: str, input_text: str, summary_type: str, level: str) -> str:
     system_prompt = _base_system_prompt(area)
+    base_text = (input_text or title).strip()
     user_prompt = f"""
-Crie um resumo em português para ACADEME.IA.
+Crie um resumo fiel em português para ACADEME.IA usando SOMENTE o conteúdo base abaixo.
+Não invente falas, exemplos, leis, artigos, autores, jurisprudência ou conceitos que não estejam no conteúdo.
+Se o conteúdo for uma transcrição de aula, resuma exatamente o que foi explicado pelo professor.
+
 Área: {_area_label(area)}
 Título/assunto: {title}
 Matéria: {subject or 'não informada'}
 Tipo de resumo: {summary_type}
 Nível: {level}
-Conteúdo base:
-{input_text or title}
 
-A saída deve conter título, introdução, tópicos principais, explicação detalhada, exemplos, pontos que caem em prova e conclusão.
+Conteúdo base integral:
+{base_text[:30000]}
+
+Formato obrigatório:
+# {title}
+## Síntese da aula
+## Pontos explicados pelo professor
+## Conceitos principais
+## Exemplos citados na aula
+## Pontos de atenção para prova
+## Conclusão
+
+Se alguma seção não existir no conteúdo base, escreva: "Não mencionado na aula."
 """.strip()
     ai_result = _call_openai(system_prompt, user_prompt)
-    if ai_result and not _is_error_result(ai_result):
+    if ai_result:
         return ai_result
 
-    fallback = _fallback_summary(area, title, subject, input_text, summary_type, level)
-    if _is_error_result(ai_result):
-        return fallback + '\n\n## Observação técnica\n' + ai_result
-    return fallback
+    return _fallback_summary(area, title, subject, input_text, summary_type, level)
 
 
 def _fallback_summary(area: str, title: str, subject: str, input_text: str, summary_type: str, level: str) -> str:

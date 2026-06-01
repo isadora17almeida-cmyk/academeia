@@ -12,7 +12,7 @@ load_dotenv(BASE_DIR / '.env')
 
 RENDER_EXTERNAL_HOSTNAME = os.getenv('RENDER_EXTERNAL_HOSTNAME', '').strip()
 SECRET_KEY = os.getenv('SECRET_KEY', 'dev-insecure-academeia-key')
-DEBUG = os.getenv('DEBUG', 'False' if RENDER_EXTERNAL_HOSTNAME else 'True').lower() in ('1', 'true', 'yes', 'on')
+DEBUG = os.getenv('DJANGO_DEBUG', os.getenv('DEBUG', 'False' if RENDER_EXTERNAL_HOSTNAME else 'True')).lower() in ('1', 'true', 'yes', 'on')
 
 _default_hosts = '127.0.0.1,localhost,0.0.0.0,*' if DEBUG else '127.0.0.1,localhost'
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', _default_hosts).split(',') if host.strip()]

@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import requests
 from django.conf import settings
 
 from .ai_service import has_configured_ai
@@ -41,12 +42,13 @@ def transcribe_uploaded_file(uploaded_file, *, title: str, subject: str = '', ar
         raise ValueError('Formato de arquivo não suportado para transcrição.')
 
     if not has_configured_ai():
-        return _fallback_transcription(title=title, subject=subject, area=area)
+        raise RuntimeError(
+            'A chave de IA não está configurada. No Render, adicione AI_PROVIDER=groq e GROQ_API_KEY com sua chave real.'
+        )
 
-    try:
-        return _transcribe_complete_with_configured_provider(uploaded_file, suffix=suffix)
-    except Exception as exc:
-        return _fallback_transcription(title=title, subject=subject, area=area, error=str(exc))
+    # Não retornamos mais transcrição demonstrativa quando a API falha.
+    # Isso evita salvar texto falso como se fosse a fala do professor.
+    return _transcribe_complete_with_configured_provider(uploaded_file, suffix=suffix)
 
 
 def extract_transcript_only(text: str) -> str:
@@ -336,34 +338,57 @@ def _transcribe_file_path(path: Path) -> str:
 
 
 def _transcribe_path_with_openai(path: Path) -> str:
-    from openai import OpenAI
-
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    with path.open('rb') as file_obj:
-        transcript = client.audio.transcriptions.create(
-            model=getattr(settings, 'OPENAI_TRANSCRIPTION_MODEL', 'whisper-1'),
-            file=(path.name, file_obj, 'application/octet-stream'),
-            response_format='text',
-            language=getattr(settings, 'TRANSCRIPTION_LANGUAGE', 'pt') or 'pt',
-            temperature=0,
-        )
-    return str(transcript)
+    api_key = getattr(settings, 'OPENAI_API_KEY', '').strip()
+    return _transcribe_path_via_http(
+        path=path,
+        api_key=api_key,
+        base_url='https://api.openai.com/v1',
+        model=getattr(settings, 'OPENAI_TRANSCRIPTION_MODEL', 'whisper-1'),
+    )
 
 
 def _transcribe_path_with_groq(path: Path) -> str:
-    from openai import OpenAI
-
     api_key = (getattr(settings, 'GROQ_API_KEY', '') or getattr(settings, 'OPENAI_API_KEY', '')).strip()
-    client = OpenAI(api_key=api_key, base_url='https://api.groq.com/openai/v1')
+    return _transcribe_path_via_http(
+        path=path,
+        api_key=api_key,
+        base_url='https://api.groq.com/openai/v1',
+        model=getattr(settings, 'GROQ_TRANSCRIPTION_MODEL', 'whisper-large-v3'),
+    )
+
+
+def _transcribe_path_via_http(*, path: Path, api_key: str, base_url: str, model: str) -> str:
+    if not api_key:
+        raise RuntimeError('Chave de transcrição ausente. Configure GROQ_API_KEY ou OPENAI_API_KEY.')
+
     with path.open('rb') as file_obj:
-        transcript = client.audio.transcriptions.create(
-            model=getattr(settings, 'GROQ_TRANSCRIPTION_MODEL', 'whisper-large-v3'),
-            file=(path.name, file_obj, 'application/octet-stream'),
-            response_format='text',
-            language=getattr(settings, 'TRANSCRIPTION_LANGUAGE', 'pt') or 'pt',
-            temperature=0,
+        response = requests.post(
+            f'{base_url}/audio/transcriptions',
+            headers={'Authorization': f'Bearer {api_key}'},
+            data={
+                'model': model,
+                'response_format': 'text',
+                'language': getattr(settings, 'TRANSCRIPTION_LANGUAGE', 'pt') or 'pt',
+                'temperature': '0',
+            },
+            files={'file': (path.name, file_obj, 'application/octet-stream')},
+            timeout=600,
         )
-    return str(transcript)
+
+    if response.status_code >= 400:
+        raise RuntimeError(f'API de transcrição retornou HTTP {response.status_code}: {response.text[:800]}')
+
+    content_type = response.headers.get('content-type', '').lower()
+    if 'application/json' in content_type:
+        data = response.json()
+        text = data.get('text') or data.get('transcript') or ''
+    else:
+        text = response.text or ''
+
+    text = text.strip()
+    if not text:
+        raise RuntimeError('A API de transcrição retornou texto vazio.')
+    return text
 
 
 def _fallback_transcription(*, title: str, subject: str, area: str, error: str = '') -> str:
