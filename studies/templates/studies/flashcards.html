@@ -1,0 +1,59 @@
+{% extends 'app_base.html' %}
+{% block title %}Flashcards — ACADEME.IA{% endblock %}
+{% block app_content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Flashcards</p>
+    <h1>Crie cartões de revisão e acompanhe acertos e erros.</h1>
+  </div>
+</section>
+
+<section class="panel-card">
+  <form method="post" data-loading-form>
+    {% csrf_token %}
+    <div class="form-grid two">
+      {% for field in form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
+    </div>
+    <button class="btn btn-primary" type="submit"><span class="spinner hidden"></span>Gerar flashcards</button>
+  </form>
+</section>
+
+{% if generated %}
+<section class="result-panel">
+  <div class="panel-header">
+    <h2>Flashcards gerados</h2>
+    {% if library_item %}
+      <div class="export-actions">
+        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'docx' %}">Word</a>
+        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'pdf' %}">PDF</a>
+        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'txt' %}">TXT</a>
+      </div>
+    {% endif %}
+  </div>
+  <div class="flashcard-grid">
+    {% for item in generated %}
+      <article class="flash-card"><strong>{{ item.question }}</strong><p>{{ item.answer }}</p></article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="panel-card">
+  <h2>Revisar flashcards</h2>
+  {% if cards %}
+    <div class="flashcard-grid">
+      {% for card in cards %}
+      <article class="flash-card flip-card" data-flip-card>
+        <div class="front"><strong>{{ card.question }}</strong><span>Clique para ver a resposta</span></div>
+        <div class="back"><p>{{ card.answer }}</p></div>
+        <div class="review-actions">
+          <form method="post" action="{% url 'studies:review_flashcard' card.id 'hit' %}">{% csrf_token %}<button class="btn btn-secondary small" type="submit">Acertei</button></form>
+          <form method="post" action="{% url 'studies:review_flashcard' card.id 'miss' %}">{% csrf_token %}<button class="btn btn-secondary small" type="submit">Errei</button></form>
+        </div>
+        <small>Acertos: {{ card.hits }} · Erros: {{ card.misses }}</small>
+      </article>
+      {% endfor %}
+    </div>
+  {% else %}<p class="muted">Nenhum flashcard criado ainda.</p>{% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Cadastro — ACADEME.IA{% endblock %}
+{% block body %}
+<main class="auth-page">
+  <section class="auth-card glass wide">
+    <div class="auth-panel">
+      <a class="brand" href="{% url 'core:home' %}"><span class="brand-mark">AI</span> ACADEME.IA</a>
+      <h1>Crie sua central acadêmica privada.</h1>
+      <p>Organize conteúdos de Direito, Medicina ou ambos com uma plataforma pessoal de IA.</p>
+      <div class="auth-orbit"></div>
+    </div>
+    <div class="auth-form">
+      {% include 'partials/messages.html' %}
+      <h2>Criar conta</h2>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <div class="form-grid two">
+          {% for field in form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
+        </div>
+        {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors }}</div>{% endif %}
+        <button class="btn btn-primary full" type="submit">Criar conta</button>
+      </form>
+      <div class="auth-links"><a href="{% url 'accounts:login' %}">Já tenho conta</a></div>
+    </div>
+  </section>
+</main>
+{% endblock %}

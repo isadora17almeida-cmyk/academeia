@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: academeia
+    runtime: python
+    buildCommand: ./build.sh
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: ALLOWED_HOSTS
+        value: .onrender.com,localhost,127.0.0.1
+      - key: AI_PROVIDER
+        value: groq
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
+      - key: GROQ_TRANSCRIPTION_MODEL
+        value: whisper-large-v3
+      - key: TRANSCRIPTION_ALWAYS_CHUNK
+        value: true
+      - key: TRANSCRIPTION_LANGUAGE
+        value: pt

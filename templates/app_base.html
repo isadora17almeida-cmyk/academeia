@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block body %}
+<div class="app-shell" data-app-shell>
+  {% include 'partials/sidebar.html' %}
+  <main class="app-main">
+    <header class="app-topbar glass">
+      <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="Abrir ou recolher menu lateral">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="topbar-title">
+        <strong>Área de estudos</strong>
+        <span>Organize aulas, resumos e revisões</span>
+      </div>
+      {% include 'partials/account_panel.html' %}
+    </header>
+    {% include 'partials/messages.html' %}
+    {% block app_content %}{% endblock %}
+  </main>
+</div>
+<div class="sidebar-backdrop" data-sidebar-backdrop></div>
+{% endblock %}

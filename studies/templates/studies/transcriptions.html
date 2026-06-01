@@ -1,0 +1,101 @@
+{% extends 'app_base.html' %}
+{% load markdown_extras %}
+{% block title %}Transcrição de Aulas — ACADEME.IA{% endblock %}
+{% block app_content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Transcrição de Aulas</p>
+    <h1>Envie áudio ou vídeo e transforme aulas longas em texto pesquisável.</h1>
+  </div>
+</section>
+
+<div class="content-grid two-columns wide-left">
+  <section class="panel-card">
+    <form method="post" enctype="multipart/form-data" data-loading-form>
+      {% csrf_token %}
+      <div class="upload-box" data-upload-box>
+        <strong>Arraste seu arquivo aqui</strong>
+        <span>MP3, WAV, M4A, MP4, AAC, OGG, WEBM, MOV, FLAC ou TXT</span>
+      </div>
+      <div class="form-grid two">
+        {% for field in form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
+      </div>
+      <button class="btn btn-primary" type="submit"><span class="spinner hidden"></span>Iniciar transcrição completa</button>
+      <p class="muted small-note">Aulas longas são divididas em partes com sobreposição para evitar cortes. Pode demorar alguns minutos.</p>
+      <div class="progress-bar fake-progress hidden" data-progress><span></span></div>
+    </form>
+  </section>
+  <aside class="panel-card">
+    <h2>Após transcrever</h2>
+    <div class="quick-tags vertical">
+      <span>Gerar resumo</span><span>Criar questões</span><span>Criar flashcards</span><span>Separar por tópicos</span><span>Corrigir texto</span><span>Exportar</span>
+    </div>
+  </aside>
+</div>
+
+{% if transcript %}
+<section class="result-panel">
+  <div class="panel-header">
+    <div>
+      <p class="eyebrow">Resultado da aula</p>
+      <h2>{{ transcript.title }}</h2>
+    </div>
+    <a class="btn btn-secondary small" href="{% url 'studies:transcript_detail' transcript.id %}">Abrir completo</a>
+  </div>
+
+  <div class="transcript-split">
+    <article class="split-card primary-split">
+      <div class="panel-header compact">
+        <h3>Transcrição do professor</h3>
+        <span class="badge-soft">Texto fiel da aula</span>
+      </div>
+      {% if transcript.status == 'demonstrativa' %}
+        <div class="alert alert-error">Esta é uma transcrição demonstrativa, não a aula completa. Configure a chave de IA no arquivo <code>.env</code>. Para aulas longas, instale ffmpeg: <code>brew install ffmpeg</code>.</div>
+      {% endif %}
+      <p class="muted small-note">{{ transcript.transcript_only|length }} caracteres transcritos.</p>
+      <div class="markdown-output transcript-only full-output">{{ transcript.transcript_only|simple_markdown }}</div>
+    </article>
+
+    {% if transcript.summary_text %}
+    <article class="split-card">
+      <div class="panel-header compact">
+        <h3>Resumo da aula</h3>
+        <span class="badge-soft">Material de estudo</span>
+      </div>
+      <div class="markdown-output">{{ transcript.summary_text|simple_markdown }}</div>
+    </article>
+    {% endif %}
+  </div>
+
+  <div class="result-actions wrap">
+    <a class="btn btn-primary" href="{% url 'studies:transcript_action' transcript.id 'resumo' %}">Salvar resumo na biblioteca</a>
+    <a class="btn btn-secondary" href="{% url 'studies:transcript_action' transcript.id 'questoes' %}">Criar questões</a>
+    <a class="btn btn-secondary" href="{% url 'studies:transcript_action' transcript.id 'flashcards' %}">Criar flashcards</a>
+    <a class="btn btn-secondary" href="{% url 'studies:transcript_action' transcript.id 'topicos' %}">Separar por tópicos</a>
+    <a class="btn btn-secondary" href="{% url 'studies:transcript_action' transcript.id 'corrigir' %}">Corrigir texto</a>
+    <a class="btn btn-primary" href="{% url 'studies:transcript_action' transcript.id 'retranscrever' %}">Retranscrever aula completa</a>
+    <a class="btn btn-secondary" href="{% url 'studies:transcript_action' transcript.id 'reprocessar' %}">Restaurar texto bruto</a>
+  </div>
+</section>
+{% endif %}
+
+<section class="panel-card">
+  <h2>Transcrições recentes</h2>
+  {% if recent %}
+    <div class="card-list">
+      {% for item in recent %}
+        <div class="mini-card">
+          <strong>{{ item.title }}</strong>
+          <span>{{ item.subject|default:'Sem matéria' }} · {{ item.created_at|date:'d/m/Y H:i' }}</span>
+          <div class="mini-actions">
+            <a href="{% url 'studies:transcript_detail' item.id %}">Ver transcrição</a>
+            <a href="{% url 'studies:transcript_action' item.id 'resumo' %}">Resumo</a>
+            <a href="{% url 'studies:transcript_action' item.id 'questoes' %}">Questões</a>
+            <a href="{% url 'studies:transcript_action' item.id 'flashcards' %}">Flashcards</a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}<p class="muted">Nenhuma transcrição ainda.</p>{% endif %}
+</section>
+{% endblock %}

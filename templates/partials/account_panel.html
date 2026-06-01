@@ -1,0 +1,16 @@
+{% if request.user.is_authenticated %}
+<a class="account-pill" href="{% url 'accounts:profile' %}" title="Abrir perfil">
+  <span class="account-avatar">
+    {% if request.user.profile.avatar_url %}
+      <img src="{{ request.user.profile.avatar_url }}" alt="Foto de {{ request.user.profile.display_name }}">
+    {% else %}
+      {{ request.user.profile.initials }}
+    {% endif %}
+  </span>
+  <span class="account-meta">
+    <strong>{{ request.user.profile.display_name }}</strong>
+    <small>{{ request.user.email|default:request.user.username }}</small>
+    <em>{{ request.user.profile.get_study_area_display }}</em>
+  </span>
+</a>
+{% endif %}

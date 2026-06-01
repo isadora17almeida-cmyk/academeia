@@ -1,0 +1,40 @@
+{% extends 'app_base.html' %}
+{% block title %}Perfil — ACADEME.IA{% endblock %}
+{% block app_content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Perfil do usuário</p>
+    <h1>Dados pessoais e objetivo acadêmico</h1>
+  </div>
+</section>
+
+<div class="content-grid two-columns">
+  <section class="panel-card">
+    <h2>Editar perfil</h2>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="form-grid two">
+        {% for field in form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
+      </div>
+      <button class="btn btn-primary" type="submit">Salvar alterações</button>
+    </form>
+  </section>
+  <aside class="panel-card stat-profile">
+    <div class="profile-avatar-large">
+      {% if request.user.profile.avatar_url %}
+        <img src="{{ request.user.profile.avatar_url }}" alt="Foto de {{ request.user.profile.display_name }}">
+      {% else %}
+        {{ request.user.profile.initials }}
+      {% endif %}
+    </div>
+    <h2>{{ request.user.profile.display_name }}</h2>
+    <p>{{ request.user.email }}</p>
+    <div class="quick-tags vertical">
+      <span>Área: {{ request.user.profile.get_study_area_display }}</span>
+      <span>Faculdade: {{ request.user.profile.college|default:'Não informada' }}</span>
+      <span>Objetivo: {{ request.user.profile.objective|default:'Não informado' }}</span>
+    </div>
+    <a class="btn btn-secondary full" href="{% url 'accounts:password_change' %}">Alterar senha</a>
+  </aside>
+</div>
+{% endblock %}

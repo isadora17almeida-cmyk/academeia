@@ -1,0 +1,71 @@
+{% extends 'app_base.html' %}
+{% block title %}Dashboard — ACADEME.IA{% endblock %}
+{% block app_content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Dashboard</p>
+    <h1>Olá, {{ request.user.first_name|default:request.user.username }}.</h1>
+    <p>Seu centro de comando para estudar com IA.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn btn-primary" href="{% url 'studies:generate_summary' %}">Novo resumo</a>
+    <a class="btn btn-secondary" href="{% url 'studies:transcriptions' %}">Transcrever aula</a>
+  </div>
+</section>
+
+<section class="stats-grid">
+  <article class="stat-card"><span>Resumos</span><strong>{{ summary_count }}</strong></article>
+  <article class="stat-card"><span>Questões</span><strong>{{ question_count }}</strong></article>
+  <article class="stat-card"><span>Transcrições</span><strong>{{ transcript_count }}</strong></article>
+  <article class="stat-card"><span>Flashcards</span><strong>{{ flashcard_count }}</strong></article>
+  <article class="stat-card"><span>Simulados</span><strong>{{ exam_count }}</strong></article>
+  <article class="stat-card"><span>Planos</span><strong>{{ study_plan_count }}</strong></article>
+</section>
+
+<section class="content-grid two-columns">
+  <div class="panel-card">
+    <h2>Progresso semanal</h2>
+    <p>{{ weekly_count }} material(is) criado(s) nos últimos 7 dias.</p>
+    <div class="progress-bar"><span style="width: {{ weekly_progress }}%"></span></div>
+    <div class="quick-actions">
+      <a href="{% url 'studies:create_questions' %}">Criar questões</a>
+      <a href="{% url 'studies:flashcards' %}">Gerar flashcards</a>
+      <a href="{% url 'studies:study_plan' %}">Plano de estudos</a>
+    </div>
+  </div>
+  <div class="panel-card">
+    <h2>Matérias sugeridas</h2>
+    <div class="subject-columns">
+      <div><h3>Direito</h3>{% for item in direito_subjects %}<span class="badge">{{ item }}</span>{% endfor %}</div>
+      <div><h3>Medicina</h3>{% for item in medicina_subjects %}<span class="badge">{{ item }}</span>{% endfor %}</div>
+    </div>
+  </div>
+</section>
+
+<section class="panel-card">
+  <div class="panel-header">
+    <h2>Últimos materiais salvos</h2>
+    <a href="{% url 'studies:library' %}">Ver biblioteca →</a>
+  </div>
+  {% if latest_items %}
+    <div class="table-wrap">
+      <table class="modern-table">
+        <thead><tr><th>Título</th><th>Tipo</th><th>Área</th><th>Matéria</th><th>Data</th></tr></thead>
+        <tbody>
+          {% for item in latest_items %}
+            <tr>
+              <td><a href="{% url 'studies:library_detail' item.id %}">{{ item.title }}</a></td>
+              <td>{{ item.get_material_type_display }}</td>
+              <td>{{ item.get_area_display }}</td>
+              <td>{{ item.subject|default:'—' }}</td>
+              <td>{{ item.created_at|date:'d/m/Y H:i' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted">Nenhum material criado ainda. Comece gerando um resumo ou transcrevendo uma aula.</p>
+  {% endif %}
+</section>
+{% endblock %}

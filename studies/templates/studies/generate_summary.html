@@ -1,0 +1,53 @@
+{% extends 'app_base.html' %}
+{% load markdown_extras %}
+{% block title %}Gerar Resumo — ACADEME.IA{% endblock %}
+{% block app_content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Gerar Resumo</p>
+    <h1>Transforme assuntos, PDFs e transcrições em material de estudo.</h1>
+  </div>
+</section>
+
+<div class="content-grid two-columns wide-left">
+  <section class="panel-card">
+    <form method="post" enctype="multipart/form-data" data-loading-form>
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="form-grid two">
+        {% for field in form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
+      </div>
+      <button class="btn btn-primary" type="submit"><span class="spinner hidden"></span>Gerar resumo</button>
+    </form>
+  </section>
+  <aside class="panel-card">
+    <h2>Botões rápidos</h2>
+    <div class="quick-tags vertical">
+      <span>Explicar artigo de lei</span><span>Criar caso prático</span><span>Questões estilo OAB</span><span>Resumo anatômico</span><span>Caso clínico</span><span>Revisão de véspera</span>
+    </div>
+  </aside>
+</div>
+
+{% if result %}
+<section class="result-panel">
+  <div class="panel-header">
+    <h2>Resultado gerado</h2>
+    {% if library_item %}
+      <div class="export-actions">
+        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'docx' %}">Word</a>
+        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'pdf' %}">PDF</a>
+        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'txt' %}">TXT</a>
+      </div>
+    {% endif %}
+  </div>
+  <div class="markdown-output">{{ result|simple_markdown }}</div>
+  <div class="result-actions">
+    {% if library_item %}
+      <a class="btn btn-primary" href="{% url 'studies:library_detail' library_item.id %}">Abrir resumo salvo</a>
+    {% endif %}
+    <a class="btn btn-secondary" href="{% url 'studies:create_questions' %}">Gerar questões</a>
+    <a class="btn btn-secondary" href="{% url 'studies:flashcards' %}">Gerar flashcards</a>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends 'app_base.html' %}
+{% load markdown_extras %}
+{% block title %}{{ item.title }} — ACADEME.IA{% endblock %}
+{% block app_content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">{{ item.get_material_type_display }}</p>
+    <h1>{{ item.title }}</h1>
+    <p>{{ item.get_area_display }} · {{ item.subject|default:'Sem matéria' }} · {{ item.created_at|date:'d/m/Y H:i' }}</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn btn-secondary" href="{% url 'studies:library' %}">Voltar</a>
+  </div>
+</section>
+
+{% if transcript_obj %}
+<section class="result-panel">
+  <div class="panel-header">
+    <div>
+      <p class="eyebrow">Texto puro</p>
+      <h2>Transcrição do professor</h2>
+    </div>
+    <div class="export-actions">
+      <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' item.id 'docx' %}">Word</a>
+      <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' item.id 'pdf' %}">PDF</a>
+      <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' item.id 'txt' %}">TXT</a>
+    </div>
+  </div>
+  <div class="markdown-output transcript-only">{{ transcript_obj.transcript_only|simple_markdown }}</div>
+</section>
+
+{% if transcript_obj.summary_text %}
+<section class="result-panel">
+  <div class="panel-header">
+    <div>
+      <p class="eyebrow">Estudo guiado</p>
+      <h2>Resumo da aula</h2>
+    </div>
+  </div>
+  <div class="markdown-output">{{ transcript_obj.summary_text|simple_markdown }}</div>
+</section>
+{% endif %}
+{% else %}
+<section class="result-panel">
+  <div class="panel-header">
+    <h2>Conteúdo</h2>
+    <div class="export-actions">
+      <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' item.id 'docx' %}">Word</a>
+      <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' item.id 'pdf' %}">PDF</a>
+      <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' item.id 'txt' %}">TXT</a>
+    </div>
+  </div>
+  <div class="markdown-output">{{ item.content|simple_markdown }}</div>
+</section>
+{% endif %}
+{% endblock %}

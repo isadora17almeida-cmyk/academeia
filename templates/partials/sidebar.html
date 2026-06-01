@@ -1,0 +1,23 @@
+<aside class="sidebar" data-sidebar>
+  <div class="sidebar-head">
+    <a class="brand brand-sidebar" href="{% url 'studies:dashboard' %}">
+      <span class="brand-mark">AI</span>
+      <span class="brand-text">ACADEME.IA</span>
+    </a>
+  </div>
+  <nav class="side-nav">
+    <a href="{% url 'studies:dashboard' %}"><span class="nav-icon">▣</span><span class="nav-label">Dashboard</span></a>
+    <a href="{% url 'studies:generate_summary' %}"><span class="nav-icon">✦</span><span class="nav-label">Gerar Resumo</span></a>
+    <a href="{% url 'studies:create_questions' %}"><span class="nav-icon">?</span><span class="nav-label">Criar Questões</span></a>
+    <a href="{% url 'studies:transcriptions' %}"><span class="nav-icon">◎</span><span class="nav-label">Transcrição</span></a>
+    <a href="{% url 'studies:library' %}"><span class="nav-icon">▤</span><span class="nav-label">Biblioteca</span></a>
+    <a href="{% url 'studies:flashcards' %}"><span class="nav-icon">◈</span><span class="nav-label">Flashcards</span></a>
+    <a href="{% url 'studies:simulations' %}"><span class="nav-icon">◉</span><span class="nav-label">Simulados</span></a>
+    <a href="{% url 'studies:study_plan' %}"><span class="nav-icon">⌁</span><span class="nav-label">Plano de Estudos</span></a>
+    <a href="{% url 'accounts:profile' %}"><span class="nav-icon">☻</span><span class="nav-label">Perfil</span></a>
+  </nav>
+  <form class="sidebar-logout" method="post" action="{% url 'accounts:logout' %}">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-ghost full"><span class="nav-icon">↩</span><span class="nav-label">Sair</span></button>
+  </form>
+</aside>

@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Login — ACADEME.IA{% endblock %}
+{% block body %}
+<main class="auth-page">
+  <section class="auth-card glass">
+    <div class="auth-panel">
+      <a class="brand" href="{% url 'core:home' %}"><span class="brand-mark">AI</span> ACADEME.IA</a>
+      <h1>Seu estudo mais inteligente começa aqui.</h1>
+      <p>Entre para acessar sua central pessoal de resumos, questões, transcrições e revisões.</p>
+      <div class="auth-orbit"></div>
+    </div>
+    <div class="auth-form">
+      {% include 'partials/messages.html' %}
+      <h2>Entrar</h2>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {% for field in form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
+        {% if form.non_field_errors %}<div class="alert alert-error">{{ form.non_field_errors }}</div>{% endif %}
+        <button class="btn btn-primary full" type="submit">Entrar</button>
+      </form>
+      <div class="auth-links">
+        <a href="{% url 'accounts:register' %}">Criar conta</a>
+        <a href="{% url 'accounts:password_reset' %}">Recuperar senha</a>
+      </div>
+    </div>
+  </section>
+</main>
+{% endblock %}

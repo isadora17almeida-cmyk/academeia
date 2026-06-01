@@ -1,0 +1,46 @@
+{% extends 'app_base.html' %}
+{% load markdown_extras %}
+{% block title %}Plano de Estudos — ACADEME.IA{% endblock %}
+{% block app_content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Plano de Estudos</p>
+    <h1>Gere um cronograma diário com revisões, metas e simulados.</h1>
+  </div>
+</section>
+
+<section class="panel-card">
+  <form method="post" data-loading-form>
+    {% csrf_token %}
+    <div class="form-grid two">
+      {% for field in form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
+    </div>
+    <button class="btn btn-primary" type="submit"><span class="spinner hidden"></span>Gerar plano</button>
+  </form>
+</section>
+
+{% if plan %}
+<section class="result-panel">
+  <div class="panel-header">
+    <h2>{{ plan.title }}</h2>
+    {% if library_item %}
+      <div class="export-actions">
+        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'docx' %}">Word</a>
+        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'pdf' %}">PDF</a>
+        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'txt' %}">TXT</a>
+      </div>
+    {% endif %}
+  </div>
+  <div class="markdown-output">{{ plan.content|simple_markdown }}</div>
+</section>
+{% endif %}
+
+<section class="panel-card">
+  <h2>Planos recentes</h2>
+  {% if plans %}
+    <div class="card-list">
+      {% for item in plans %}<div class="mini-card"><strong>{{ item.title }}</strong><span>{{ item.get_objective_display }} · Progresso {{ item.progress }}%</span><div class="progress-bar"><span style="width: {{ item.progress }}%"></span></div></div>{% endfor %}
+    </div>
+  {% else %}<p class="muted">Nenhum plano criado ainda.</p>{% endif %}
+</section>
+{% endblock %}

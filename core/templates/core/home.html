@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}ACADEME.IA — IA para Direito e Medicina{% endblock %}
+{% block body %}
+<header class="site-header glass">
+  <a class="brand" href="{% url 'core:home' %}"><span class="brand-mark">AI</span> ACADEME.IA</a>
+  <button class="menu-toggle" data-menu-toggle>☰</button>
+  <nav class="site-nav" data-menu>
+    <a href="#inicio">Início</a>
+    <a href="#recursos">Recursos</a>
+    <a href="#direito">Direito</a>
+    <a href="#medicina">Medicina</a>
+    <a href="#transcricao">Transcrição</a>
+    <a href="{% url 'studies:library' %}">Biblioteca</a>
+    {% if user.is_authenticated %}
+      <a href="{% url 'studies:dashboard' %}">Dashboard</a>
+    {% else %}
+      <a href="{% url 'accounts:login' %}">Login</a>
+      <a class="btn btn-primary small" href="{% url 'accounts:register' %}">Começar</a>
+    {% endif %}
+  </nav>
+</header>
+
+<main id="inicio">
+  <section class="hero section-pad">
+    <div class="hero-copy reveal">
+      <p class="eyebrow">Sua jornada acadêmica, potencializada por IA</p>
+      <h1>IA para estudantes de <span>Direito</span> e <span>Medicina</span></h1>
+      <p class="hero-text">Resuma conteúdos complexos, gere questões personalizadas e transcreva suas aulas com inteligência artificial. Estude com mais foco, profundidade e resultado.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="{% url 'accounts:register' %}">Começar agora</a>
+        <a class="btn btn-secondary" href="#recursos">Ver recursos</a>
+      </div>
+      <div class="hero-note">Sua central pessoal de estudos com IA</div>
+    </div>
+    <div class="hero-visual reveal" aria-hidden="true">
+      <div class="neon-blob">
+        <div class="ring ring-one"></div>
+        <div class="ring ring-two"></div>
+        <div class="core-glow">ACADEME<br><span>.IA</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="recursos" class="section-pad">
+    <div class="section-title reveal">
+      <p class="eyebrow">Recursos principais</p>
+      <h2>Uma plataforma privada para estudar, organizar e revisar</h2>
+    </div>
+    <div class="feature-grid">
+      <article class="feature-card reveal">
+        <div class="icon">✦</div>
+        <h3>Resumos Inteligentes</h3>
+        <p>Gere resumos completos e objetivos de livros, artigos, PDFs e assuntos digitados.</p>
+        <a href="{% url 'studies:generate_summary' %}">Gerar resumo →</a>
+      </article>
+      <article class="feature-card reveal">
+        <div class="icon">?</div>
+        <h3>Questões Personalizadas</h3>
+        <p>Crie questões fáceis, médias e difíceis com gabarito e explicação detalhada.</p>
+        <a href="{% url 'studies:create_questions' %}">Criar questões →</a>
+      </article>
+      <article id="transcricao" class="feature-card reveal">
+        <div class="icon">◎</div>
+        <h3>Transcrição de Aulas</h3>
+        <p>Transcreva áudio e vídeo de professores e transforme suas aulas em texto pesquisável.</p>
+        <a href="{% url 'studies:transcriptions' %}">Transcrever aula →</a>
+      </article>
+      <article class="feature-card reveal">
+        <div class="icon">⇩</div>
+        <h3>Exportação Word, PDF e TXT</h3>
+        <p>Baixe seus conteúdos nos formatos que você precisa para estudar melhor.</p>
+        <a href="{% url 'studies:library' %}">Abrir biblioteca →</a>
+      </article>
+    </div>
+  </section>
+
+  <section id="direito" class="split-section section-pad reveal">
+    <div>
+      <p class="eyebrow">Modo Direito</p>
+      <h2>Raciocínio jurídico estruturado para prova e prática</h2>
+      <p>Gere conceitos, fundamentos legais, princípios, doutrina resumida, jurisprudência, casos práticos, pegadinhas de prova e questões comentadas.</p>
+      <div class="quick-tags">
+        <span>Explicar artigo de lei</span><span>Caso prático</span><span>Questões OAB</span><span>Doutrina</span><span>Quadro comparativo</span>
+      </div>
+    </div>
+    <div class="glass-card list-card">
+      <h3>Exemplos de Direito</h3>
+      <ul>
+        <li>Obrigação de fazer no Direito Civil</li>
+        <li>Art. 247 do Código Civil</li>
+        <li>Direito Penal e tipicidade</li>
+        <li>Controle de constitucionalidade</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="medicina" class="split-section section-pad reveal">
+    <div class="glass-card list-card">
+      <h3>Exemplos de Medicina</h3>
+      <ul>
+        <li>Pâncreas para prova de anatomia</li>
+        <li>Caso clínico sobre diabetes</li>
+        <li>Fisiopatologia da inflamação</li>
+        <li>Farmacologia cardiovascular</li>
+      </ul>
+    </div>
+    <div>
+      <p class="eyebrow">Modo Medicina</p>
+      <h2>Integre anatomia, fisiologia, clínica e questões</h2>
+      <p>Crie resumos médicos com conceito, anatomia, fisiologia, fisiopatologia, diagnóstico, exames, tratamento, caso clínico e revisão para prova.</p>
+      <div class="quick-tags">
+        <span>Caso clínico</span><span>Resumo anatômico</span><span>Tabela comparativa</span><span>Questões de prova</span><span>Revisão rápida</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-final section-pad reveal">
+    <div class="cta-panel">
+      <div class="cta-icon">🎓</div>
+      <h2>Estude com inteligência. Destaque-se na prática.</h2>
+      <p>Transforme seus estudos em uma experiência mais organizada, rápida e eficiente com IA.</p>
+      <a class="btn btn-primary" href="{% url 'accounts:register' %}">Começar agora</a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">© {% now "Y" %} ACADEME.IA — Plataforma pessoal de estudos com IA.</footer>
+{% endblock %}

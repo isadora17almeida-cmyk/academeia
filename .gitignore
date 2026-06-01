@@ -1,0 +1,10 @@
+.env
+venv/
+__pycache__/
+*.pyc
+db.sqlite3
+media/uploads/*
+media/exports/*
+!media/uploads/.gitkeep
+!media/exports/.gitkeep
+staticfiles/

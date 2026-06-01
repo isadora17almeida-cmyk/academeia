@@ -1,0 +1,65 @@
+{% extends 'app_base.html' %}
+{% block title %}Biblioteca — ACADEME.IA{% endblock %}
+{% block app_content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Biblioteca</p>
+    <h1>Todos os seus materiais organizados por área, matéria, tipo e pasta.</h1>
+  </div>
+</section>
+
+<div class="content-grid two-columns wide-left">
+  <section class="panel-card">
+    <h2>Filtros</h2>
+    <form method="get" class="form-grid four">
+      {% for field in filter_form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
+      <button class="btn btn-secondary" type="submit">Filtrar</button>
+    </form>
+  </section>
+  <aside class="panel-card">
+    <h2>Nova pasta</h2>
+    <form method="post">
+      {% csrf_token %}
+      {% for field in folder_form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
+      <button class="btn btn-primary full" type="submit">Criar pasta</button>
+    </form>
+  </aside>
+</div>
+
+<section class="panel-card">
+  <div class="panel-header"><h2>Materiais salvos</h2><span class="badge">{{ items.count }} item(ns)</span></div>
+  {% if folders %}
+    <div class="folder-row">{% for folder in folders %}<span class="folder-chip">▤ {{ folder.name }}</span>{% endfor %}</div>
+  {% endif %}
+  {% if items %}
+    <div class="table-wrap">
+      <table class="modern-table">
+        <thead><tr><th>Título</th><th>Tipo</th><th>Área</th><th>Matéria</th><th>Data</th><th>Ações</th></tr></thead>
+        <tbody>
+          {% for item in items %}
+          <tr>
+            <td><a href="{% url 'studies:library_detail' item.id %}">{{ item.title }}</a>{% if item.favorite %} <span class="badge">Favorito</span>{% endif %}</td>
+            <td>{{ item.get_material_type_display }}</td>
+            <td>{{ item.get_area_display }}</td>
+            <td>{{ item.subject|default:'—' }}</td>
+            <td>{{ item.created_at|date:'d/m/Y' }}</td>
+            <td class="table-actions">
+              <a href="{% url 'studies:library_detail' item.id %}">Visualizar</a>
+              <a href="{% url 'studies:export_library_item' item.id 'pdf' %}">PDF</a>
+              <a href="{% url 'studies:export_library_item' item.id 'docx' %}">Word</a>
+              <a href="{% url 'studies:export_library_item' item.id 'txt' %}">TXT</a>
+              <form method="post" action="{% url 'studies:library_toggle_favorite' item.id %}">
+                {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit">★</button>
+              </form>
+              <form method="post" action="{% url 'studies:library_delete' item.id %}" onsubmit="return confirm('Excluir este item?')">
+                {% csrf_token %}<button type="submit">Excluir</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}<p class="muted">Nenhum material encontrado.</p>{% endif %}
+</section>
+{% endblock %}
