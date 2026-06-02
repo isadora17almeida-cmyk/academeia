@@ -34,3 +34,11 @@ services:
         value: 5
       - key: TRANSCRIPTION_RETRY_ATTEMPTS
         value: 6
+      - key: TRANSCRIPTION_PROMPT
+        value: Aula de Direito em português do Brasil. Preserve a fala do professor e atenção a termos jurídicos.
+      - key: SUMMARY_DIRECT_CHARS
+        value: 9000
+      - key: SUMMARY_SOURCE_MAX_CHARS
+        value: 9000
+      - key: SUMMARY_MAX_OUTPUT_TOKENS
+        value: 1200

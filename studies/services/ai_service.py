@@ -7,6 +7,7 @@ A aplicação funciona em dois modos:
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -46,7 +47,7 @@ def _is_error_result(text: str | None) -> bool:
     return bool(text and text.startswith('[[IA indisponível'))
 
 
-def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
+def _call_openai(system_prompt: str, user_prompt: str, *, max_tokens: int | None = None) -> str | None:
     """Chama OpenAI/Groq sem usar o SDK oficial.
 
     A versão anterior usava ``openai.OpenAI``. Em alguns deploys do Render,
@@ -76,6 +77,8 @@ def _call_openai(system_prompt: str, user_prompt: str) -> str | None:
         ],
         'temperature': 0.25,
     }
+    if max_tokens:
+        payload['max_tokens'] = int(max_tokens)
     try:
         response = requests.post(
             f'{base_url}/chat/completions',
@@ -120,8 +123,22 @@ def _base_system_prompt(area: str) -> str:
 
 
 def generate_summary(*, area: str, title: str, subject: str, input_text: str, summary_type: str, level: str) -> str:
+    """Gera resumo sem estourar o limite de tokens da Groq.
+
+    A versão anterior enviava até 30.000 caracteres de transcrição em uma única
+    chamada. Em contas gratuitas/baixo limite da Groq isso pode causar HTTP 413
+    por tokens por minuto. Esta versão primeiro condensa a transcrição inteira
+    de modo local e só então envia uma entrada curta para a IA.
+
+    Regra importante: se a IA falhar, o sistema não mostra mais o erro bruto como
+    "resumo"; ele monta um resumo local fiel usando trechos reais da transcrição.
+    """
     system_prompt = _base_system_prompt(area)
     base_text = (input_text or title).strip()
+    if not base_text:
+        base_text = title
+
+    source_text = _prepare_summary_source(base_text)
     user_prompt = f"""
 Crie um resumo fiel em português para ACADEME.IA usando SOMENTE o conteúdo base abaixo.
 Não invente falas, exemplos, leis, artigos, autores, jurisprudência ou conceitos que não estejam no conteúdo.
@@ -133,8 +150,8 @@ Matéria: {subject or 'não informada'}
 Tipo de resumo: {summary_type}
 Nível: {level}
 
-Conteúdo base integral:
-{base_text[:30000]}
+Conteúdo base condensado a partir da transcrição completa:
+{source_text}
 
 Formato obrigatório:
 # {title}
@@ -147,12 +164,209 @@ Formato obrigatório:
 
 Se alguma seção não existir no conteúdo base, escreva: "Não mencionado na aula."
 """.strip()
-    ai_result = _call_openai(system_prompt, user_prompt)
-    if ai_result:
+    ai_result = _call_openai(system_prompt, user_prompt, max_tokens=getattr(settings, 'SUMMARY_MAX_OUTPUT_TOKENS', 1200))
+    if ai_result and not _is_error_result(ai_result):
         return ai_result
 
-    return _fallback_summary(area, title, subject, input_text, summary_type, level)
+    return _extractive_summary(
+        area=area,
+        title=title,
+        subject=subject,
+        input_text=base_text,
+        summary_type=summary_type,
+        level=level,
+        ai_error=ai_result if _is_error_result(ai_result) else '',
+    )
 
+
+def _prepare_summary_source(text: str) -> str:
+    """Reduz uma transcrição longa mantendo cobertura do começo, meio e fim.
+
+    O objetivo não é cortar a aula de forma cega; é extrair trechos distribuídos
+    por toda a transcrição para caber no limite do modelo usado no Render.
+    """
+    cleaned = _normalize_transcript_for_summary(text)
+    direct_chars = int(getattr(settings, 'SUMMARY_DIRECT_CHARS', 9000))
+    max_chars = int(getattr(settings, 'SUMMARY_SOURCE_MAX_CHARS', 9000))
+    if len(cleaned) <= direct_chars:
+        return cleaned
+
+    parts = _split_transcript_parts(cleaned)
+    if not parts:
+        return cleaned[:max_chars]
+
+    budget_per_part = max(180, max_chars // max(1, len(parts)))
+    selected: list[str] = []
+    total = len(parts)
+    for idx, part in enumerate(parts, start=1):
+        snippet = _smart_excerpt(part, budget_per_part)
+        if snippet:
+            selected.append(f'[Trecho {idx}/{total}] {snippet}')
+
+    condensed = '\n\n'.join(selected)
+    if len(condensed) > max_chars:
+        condensed = _evenly_sample_text(condensed, max_chars)
+    return condensed.strip()
+
+
+def _normalize_transcript_for_summary(text: str) -> str:
+    text = re.sub(r'\r\n?', '\n', text or '')
+    text = re.sub(r'\[Parte\s+\d+/\d+\s+—[^\]]*\]', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    text = re.sub(r'[ \t]+', ' ', text)
+    return text.strip()
+
+
+def _split_transcript_parts(text: str) -> list[str]:
+    paragraphs = [p.strip() for p in re.split(r'\n\s*\n+', text) if p.strip()]
+    if len(paragraphs) >= 6:
+        return paragraphs
+    sentences = _split_sentences(text)
+    if not sentences:
+        return [text] if text else []
+    grouped = []
+    current: list[str] = []
+    current_len = 0
+    for sentence in sentences:
+        current.append(sentence)
+        current_len += len(sentence)
+        if current_len >= 1200:
+            grouped.append(' '.join(current))
+            current = []
+            current_len = 0
+    if current:
+        grouped.append(' '.join(current))
+    return grouped
+
+
+def _smart_excerpt(text: str, max_chars: int) -> str:
+    text = text.strip()
+    if len(text) <= max_chars:
+        return text
+    sentences = _split_sentences(text)
+    if not sentences:
+        return text[:max_chars].rsplit(' ', 1)[0]
+    chosen: list[str] = []
+    used = 0
+    # Prioriza início do trecho, mas inclui uma frase do meio/fim se couber.
+    candidate_indexes = [0, 1, max(0, len(sentences)//2), max(0, len(sentences)-1)]
+    seen = set()
+    for idx in candidate_indexes:
+        if idx in seen or idx >= len(sentences):
+            continue
+        seen.add(idx)
+        sentence = sentences[idx]
+        if used + len(sentence) + 1 <= max_chars:
+            chosen.append(sentence)
+            used += len(sentence) + 1
+    if not chosen:
+        return text[:max_chars].rsplit(' ', 1)[0]
+    return ' '.join(chosen).strip()
+
+
+def _evenly_sample_text(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    if max_chars < 1000:
+        return text[:max_chars]
+    third = max_chars // 3
+    middle_start = max(0, len(text)//2 - third//2)
+    return '\n\n'.join([
+        text[:third].rsplit(' ', 1)[0],
+        text[middle_start:middle_start+third].strip().rsplit(' ', 1)[0],
+        text[-third:].strip(),
+    ])
+
+
+def _split_sentences(text: str) -> list[str]:
+    return [s.strip() for s in re.split(r'(?<=[.!?])\s+', text or '') if s.strip()]
+
+
+def _extractive_summary(*, area: str, title: str, subject: str, input_text: str, summary_type: str, level: str, ai_error: str = '') -> str:
+    """Resumo local fiel quando a IA ultrapassa limite ou fica indisponível."""
+    cleaned = _normalize_transcript_for_summary(input_text)
+    sentences = _split_sentences(cleaned)
+    if not sentences:
+        return _fallback_summary(area, title, subject, input_text, summary_type, level)
+
+    selected = _rank_representative_sentences(sentences, limit=14)
+    key_terms = _extract_key_terms(cleaned, limit=16)
+    examples = [s for s in selected if re.search(r'\b(exemplo|por exemplo|imagine|caso|situação)\b', s, flags=re.IGNORECASE)]
+    attention = [s for s in selected if re.search(r'\b(prova|atenção|cuidado|importante|observem|guardem|não basta|sempre|nunca)\b', s, flags=re.IGNORECASE)]
+
+    error_note = ''
+    if ai_error:
+        compact_error = ai_error.replace('\n', ' ')[:350]
+        error_note = f'\n\n> Observação: a IA externa não foi usada no resumo final porque retornou limite/erro técnico. O resumo abaixo foi montado localmente com trechos reais da transcrição. Detalhe: {compact_error}\n'
+
+    bullets = '\n'.join(f'- {s}' for s in selected[:8]) or '- Não mencionado na aula.'
+    concept_bullets = '\n'.join(f'- {term}' for term in key_terms) or '- Não mencionado na aula.'
+    example_bullets = '\n'.join(f'- {s}' for s in examples[:4]) or '- Não mencionado na aula.'
+    attention_bullets = '\n'.join(f'- {s}' for s in attention[:5]) or '- Não mencionado na aula.'
+
+    return f"""# {title}
+{error_note}
+## Síntese da aula
+A aula tratou de **{subject or title}** na área de {_area_label(area)}. O conteúdo abaixo foi produzido a partir da transcrição do professor, sem acrescentar informações externas.
+
+## Pontos explicados pelo professor
+{bullets}
+
+## Conceitos principais
+{concept_bullets}
+
+## Exemplos citados na aula
+{example_bullets}
+
+## Pontos de atenção para prova
+{attention_bullets}
+
+## Conclusão
+Revise a transcrição completa junto com estes pontos. Para prova, transforme cada item explicado pelo professor em uma pergunta ativa e compare com os exemplos mencionados na aula.
+""".strip()
+
+
+def _rank_representative_sentences(sentences: list[str], limit: int = 12) -> list[str]:
+    stopwords = _stopwords_pt()
+    frequencies: dict[str, int] = {}
+    for sentence in sentences:
+        for word in re.findall(r'[A-Za-zÀ-ÿ]{4,}', sentence.lower()):
+            if word not in stopwords:
+                frequencies[word] = frequencies.get(word, 0) + 1
+    scored: list[tuple[float, int, str]] = []
+    total = max(1, len(sentences))
+    for idx, sentence in enumerate(sentences):
+        words = re.findall(r'[A-Za-zÀ-ÿ]{4,}', sentence.lower())
+        score = sum(frequencies.get(w, 0) for w in words if w not in stopwords)
+        if re.search(r'\b(professor|observem|guardem|importante|prova|exemplo|artigo|código|lei)\b', sentence, re.I):
+            score += 8
+        # Distribui a seleção pela aula inteira: começo, meio e final têm chance.
+        position_bonus = 1.0 - abs((idx / total) - 0.5) * 0.15
+        scored.append((score * position_bonus, idx, sentence.strip()))
+    top = sorted(scored, key=lambda item: item[0], reverse=True)[:limit]
+    return [sentence for _, _, sentence in sorted(top, key=lambda item: item[1])]
+
+
+def _extract_key_terms(text: str, limit: int = 12) -> list[str]:
+    stopwords = _stopwords_pt()
+    counts: dict[str, int] = {}
+    for raw in re.findall(r'[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\-]{4,}', text.lower()):
+        word = raw.strip('-')
+        if word and word not in stopwords:
+            counts[word] = counts.get(word, 0) + 1
+    ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    return [word for word, _ in ordered[:limit]]
+
+
+def _stopwords_pt() -> set[str]:
+    return {
+        'aquele', 'aquela', 'aquilo', 'agora', 'assim', 'ainda', 'apenas', 'cada', 'como', 'comum', 'contra',
+        'depois', 'dessa', 'desse', 'desta', 'deste', 'disso', 'dizer', 'então', 'entre', 'essa', 'esse', 'esta',
+        'este', 'falar', 'fazer', 'forma', 'foram', 'gente', 'hoje', 'isso', 'mais', 'mesma', 'mesmo', 'muito',
+        'nossa', 'nosso', 'onde', 'outra', 'outro', 'para', 'parte', 'pelas', 'pelos', 'pode', 'porque', 'porém',
+        'professor', 'quando', 'qual', 'quais', 'sobre', 'também', 'todas', 'todos', 'vamos', 'você', 'vocês',
+        'será', 'serão', 'termos', 'existe', 'existem', 'direito', 'aula', 'tema', 'texto', 'transcrição'
+    }
 
 def _fallback_summary(area: str, title: str, subject: str, input_text: str, summary_type: str, level: str) -> str:
     base = input_text.strip() or title

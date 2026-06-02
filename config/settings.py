@@ -139,5 +139,12 @@ TRANSCRIPTION_DIRECT_MAX_MB = float(os.getenv('TRANSCRIPTION_DIRECT_MAX_MB', '10
 TRANSCRIPTION_FORCE_CHUNK_AFTER_SECONDS = int(os.getenv('TRANSCRIPTION_FORCE_CHUNK_AFTER_SECONDS', '45'))
 TRANSCRIPTION_ALWAYS_CHUNK = os.getenv('TRANSCRIPTION_ALWAYS_CHUNK', 'true').lower() in ('1', 'true', 'yes', 'on')
 TRANSCRIPTION_LANGUAGE = os.getenv('TRANSCRIPTION_LANGUAGE', 'pt')
+TRANSCRIPTION_PROMPT = os.getenv('TRANSCRIPTION_PROMPT', '')
 
 TRANSCRIPTION_RETRY_ATTEMPTS = int(os.getenv('TRANSCRIPTION_RETRY_ATTEMPTS', '6'))
+
+# Resumo de transcrições longas
+# Mantém as chamadas à IA abaixo do limite de tokens por minuto de contas gratuitas/baixo limite.
+SUMMARY_DIRECT_CHARS = int(os.getenv('SUMMARY_DIRECT_CHARS', '9000'))
+SUMMARY_SOURCE_MAX_CHARS = int(os.getenv('SUMMARY_SOURCE_MAX_CHARS', '9000'))
+SUMMARY_MAX_OUTPUT_TOKENS = int(os.getenv('SUMMARY_MAX_OUTPUT_TOKENS', '1200'))

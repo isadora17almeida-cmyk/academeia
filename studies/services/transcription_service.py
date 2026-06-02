@@ -47,9 +47,11 @@ def transcribe_uploaded_file(uploaded_file, *, title: str, subject: str = '', ar
             'A chave de IA não está configurada. No Render, adicione AI_PROVIDER=groq e GROQ_API_KEY com sua chave real.'
         )
 
+    prompt = _build_transcription_prompt(title=title, subject=subject, area=area)
+
     # Não retornamos mais transcrição demonstrativa quando a API falha.
     # Isso evita salvar texto falso como se fosse a fala do professor.
-    return _transcribe_complete_with_configured_provider(uploaded_file, suffix=suffix)
+    return _transcribe_complete_with_configured_provider(uploaded_file, suffix=suffix, prompt=prompt)
 
 
 def extract_transcript_only(text: str) -> str:
@@ -95,7 +97,7 @@ def is_demo_transcription(text: str) -> bool:
     return bool(text and text.lstrip().startswith(FALLBACK_PREFIX))
 
 
-def _transcribe_complete_with_configured_provider(uploaded_file, *, suffix: str) -> str:
+def _transcribe_complete_with_configured_provider(uploaded_file, *, suffix: str, prompt: str = "") -> str:
     with tempfile.TemporaryDirectory(prefix='academeia_transcricao_') as temp_dir_name:
         temp_dir = Path(temp_dir_name)
         source_path = temp_dir / f'entrada{suffix}'
@@ -128,9 +130,10 @@ def _transcribe_complete_with_configured_provider(uploaded_file, *, suffix: str)
                 duration=duration,
                 chunk_seconds=chunk_seconds,
                 overlap_seconds=overlap_seconds,
+                prompt=prompt,
             )
 
-        direct_text = _transcribe_file_path(source_path).strip()
+        direct_text = _transcribe_file_path(source_path, prompt=prompt).strip()
 
         # Proteção extra: se o retorno direto for pequeno demais para a duração,
         # reprocessa em blocos. Isso resolve casos em que a API devolve só o começo.
@@ -141,6 +144,7 @@ def _transcribe_complete_with_configured_provider(uploaded_file, *, suffix: str)
                 duration=duration,
                 chunk_seconds=chunk_seconds,
                 overlap_seconds=overlap_seconds,
+                prompt=prompt,
             ).strip()
             if len(chunked_text) > len(direct_text):
                 return chunked_text
@@ -240,14 +244,14 @@ def _media_duration_seconds(path: Path) -> float | None:
         return None
 
 
-def _transcribe_in_chunks(*, source_path: Path, temp_dir: Path, duration: float | None, chunk_seconds: int, overlap_seconds: int) -> str:
+def _transcribe_in_chunks(*, source_path: Path, temp_dir: Path, duration: float | None, chunk_seconds: int, overlap_seconds: int, prompt: str = "") -> str:
     if duration is None:
         duration = _media_duration_seconds(source_path)
     if not duration:
         # Sem duração, faz uma conversão única comprimida e envia direto.
         converted = temp_dir / 'audio_convertido.flac'
         _convert_audio_slice(source_path, converted, start=None, duration=None)
-        return _transcribe_file_path(converted).strip()
+        return _transcribe_file_path(converted, prompt=prompt).strip()
 
     chunk_paths = _split_media_precisely(
         source_path=source_path,
@@ -257,13 +261,13 @@ def _transcribe_in_chunks(*, source_path: Path, temp_dir: Path, duration: float 
         overlap_seconds=overlap_seconds,
     )
     if not chunk_paths:
-        return _transcribe_file_path(source_path).strip()
+        return _transcribe_file_path(source_path, prompt=prompt).strip()
 
     parts: list[str] = []
     total = len(chunk_paths)
     for index, chunk_path in enumerate(chunk_paths, start=1):
         try:
-            chunk_text = _transcribe_file_path(chunk_path).strip()
+            chunk_text = _transcribe_file_path(chunk_path, prompt=prompt).strip()
         except RuntimeError as exc:
             # Se a API da Groq/Cloudflare oscilou naquele bloco, paramos com uma
             # mensagem clara. Não continuamos porque o objetivo é transcrição completa.
@@ -339,34 +343,36 @@ def _looks_incomplete(text: str, duration_seconds: float) -> bool:
     return len(stripped) < min_chars
 
 
-def _transcribe_file_path(path: Path) -> str:
+def _transcribe_file_path(path: Path, *, prompt: str = "") -> str:
     provider = getattr(settings, 'AI_PROVIDER', 'openai').lower()
     if provider == 'groq':
-        return _transcribe_path_with_groq(path)
-    return _transcribe_path_with_openai(path)
+        return _transcribe_path_with_groq(path, prompt=prompt)
+    return _transcribe_path_with_openai(path, prompt=prompt)
 
 
-def _transcribe_path_with_openai(path: Path) -> str:
+def _transcribe_path_with_openai(path: Path, *, prompt: str = "") -> str:
     api_key = getattr(settings, 'OPENAI_API_KEY', '').strip()
     return _transcribe_path_via_http(
         path=path,
         api_key=api_key,
         base_url='https://api.openai.com/v1',
         model=getattr(settings, 'OPENAI_TRANSCRIPTION_MODEL', 'whisper-1'),
+        prompt=prompt,
     )
 
 
-def _transcribe_path_with_groq(path: Path) -> str:
+def _transcribe_path_with_groq(path: Path, *, prompt: str = "") -> str:
     api_key = (getattr(settings, 'GROQ_API_KEY', '') or getattr(settings, 'OPENAI_API_KEY', '')).strip()
     return _transcribe_path_via_http(
         path=path,
         api_key=api_key,
         base_url='https://api.groq.com/openai/v1',
         model=getattr(settings, 'GROQ_TRANSCRIPTION_MODEL', 'whisper-large-v3'),
+        prompt=prompt,
     )
 
 
-def _transcribe_path_via_http(*, path: Path, api_key: str, base_url: str, model: str) -> str:
+def _transcribe_path_via_http(*, path: Path, api_key: str, base_url: str, model: str, prompt: str = "") -> str:
     """Transcreve um arquivo local usando endpoint compatível com OpenAI.
 
     Esta versão é mais tolerante a instabilidades da Groq/Cloudflare:
@@ -386,15 +392,18 @@ def _transcribe_path_via_http(*, path: Path, api_key: str, base_url: str, model:
     for attempt in range(1, attempts + 1):
         try:
             with path.open('rb') as file_obj:
+                data = {
+                    'model': model,
+                    'response_format': 'text',
+                    'language': getattr(settings, 'TRANSCRIPTION_LANGUAGE', 'pt') or 'pt',
+                    'temperature': '0',
+                }
+                if prompt:
+                    data['prompt'] = prompt
                 response = requests.post(
                     endpoint,
                     headers={'Authorization': f'Bearer {api_key}'},
-                    data={
-                        'model': model,
-                        'response_format': 'text',
-                        'language': getattr(settings, 'TRANSCRIPTION_LANGUAGE', 'pt') or 'pt',
-                        'temperature': '0',
-                    },
+                    data=data,
                     files={'file': (path.name, file_obj, 'application/octet-stream')},
                     timeout=(30, 600),
                 )
