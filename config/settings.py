@@ -128,14 +128,16 @@ OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 AI_PROVIDER = os.getenv('AI_PROVIDER', 'openai').strip().lower()
 GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
 GROQ_MODEL = os.getenv('GROQ_MODEL', 'llama-3.1-8b-instant')
-GROQ_TRANSCRIPTION_MODEL = os.getenv('GROQ_TRANSCRIPTION_MODEL', 'whisper-large-v3')
+GROQ_TRANSCRIPTION_MODEL = os.getenv('GROQ_TRANSCRIPTION_MODEL', 'whisper-large-v3-turbo')
 OPENAI_TRANSCRIPTION_MODEL = os.getenv('OPENAI_TRANSCRIPTION_MODEL', 'whisper-1')
 
 # Transcrição completa de aulas longas
 # Se ffmpeg estiver instalado, o sistema divide áudio/vídeo em partes e junta o texto final.
-TRANSCRIPTION_CHUNK_SECONDS = int(os.getenv('TRANSCRIPTION_CHUNK_SECONDS', '180'))
+TRANSCRIPTION_CHUNK_SECONDS = int(os.getenv('TRANSCRIPTION_CHUNK_SECONDS', '45'))
 TRANSCRIPTION_OVERLAP_SECONDS = int(os.getenv('TRANSCRIPTION_OVERLAP_SECONDS', '5'))
 TRANSCRIPTION_DIRECT_MAX_MB = float(os.getenv('TRANSCRIPTION_DIRECT_MAX_MB', '10'))
-TRANSCRIPTION_FORCE_CHUNK_AFTER_SECONDS = int(os.getenv('TRANSCRIPTION_FORCE_CHUNK_AFTER_SECONDS', '120'))
+TRANSCRIPTION_FORCE_CHUNK_AFTER_SECONDS = int(os.getenv('TRANSCRIPTION_FORCE_CHUNK_AFTER_SECONDS', '45'))
 TRANSCRIPTION_ALWAYS_CHUNK = os.getenv('TRANSCRIPTION_ALWAYS_CHUNK', 'true').lower() in ('1', 'true', 'yes', 'on')
 TRANSCRIPTION_LANGUAGE = os.getenv('TRANSCRIPTION_LANGUAGE', 'pt')
+
+TRANSCRIPTION_RETRY_ATTEMPTS = int(os.getenv('TRANSCRIPTION_RETRY_ATTEMPTS', '6'))

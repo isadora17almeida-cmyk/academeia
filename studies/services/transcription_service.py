@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import requests
@@ -261,7 +262,15 @@ def _transcribe_in_chunks(*, source_path: Path, temp_dir: Path, duration: float 
     parts: list[str] = []
     total = len(chunk_paths)
     for index, chunk_path in enumerate(chunk_paths, start=1):
-        chunk_text = _transcribe_file_path(chunk_path).strip()
+        try:
+            chunk_text = _transcribe_file_path(chunk_path).strip()
+        except RuntimeError as exc:
+            # Se a API da Groq/Cloudflare oscilou naquele bloco, paramos com uma
+            # mensagem clara. Não continuamos porque o objetivo é transcrição completa.
+            raise RuntimeError(
+                f'Falha ao transcrever a parte {index}/{total}. '
+                f'Nada foi salvo como transcrição completa. Detalhe: {exc}'
+            ) from exc
         if chunk_text:
             start_second = _chunk_start_second(index, chunk_seconds, overlap_seconds)
             parts.append(f'[Parte {index}/{total} — aprox. {math.floor(start_second / 60)} min]\n{chunk_text}')
@@ -358,37 +367,92 @@ def _transcribe_path_with_groq(path: Path) -> str:
 
 
 def _transcribe_path_via_http(*, path: Path, api_key: str, base_url: str, model: str) -> str:
+    """Transcreve um arquivo local usando endpoint compatível com OpenAI.
+
+    Esta versão é mais tolerante a instabilidades da Groq/Cloudflare:
+    - reabre o arquivo a cada tentativa;
+    - tenta novamente em 429/5xx/502;
+    - usa chunks menores configuráveis no Render;
+    - nunca inventa transcrição se todas as tentativas falharem.
+    """
     if not api_key:
         raise RuntimeError('Chave de transcrição ausente. Configure GROQ_API_KEY ou OPENAI_API_KEY.')
 
-    with path.open('rb') as file_obj:
-        response = requests.post(
-            f'{base_url}/audio/transcriptions',
-            headers={'Authorization': f'Bearer {api_key}'},
-            data={
-                'model': model,
-                'response_format': 'text',
-                'language': getattr(settings, 'TRANSCRIPTION_LANGUAGE', 'pt') or 'pt',
-                'temperature': '0',
-            },
-            files={'file': (path.name, file_obj, 'application/octet-stream')},
-            timeout=600,
-        )
+    endpoint = f'{base_url.rstrip("/")}/audio/transcriptions'
+    attempts = max(1, int(getattr(settings, 'TRANSCRIPTION_RETRY_ATTEMPTS', 6)))
+    retry_statuses = {408, 409, 425, 429, 500, 502, 503, 504}
+    last_error = ''
 
-    if response.status_code >= 400:
-        raise RuntimeError(f'API de transcrição retornou HTTP {response.status_code}: {response.text[:800]}')
+    for attempt in range(1, attempts + 1):
+        try:
+            with path.open('rb') as file_obj:
+                response = requests.post(
+                    endpoint,
+                    headers={'Authorization': f'Bearer {api_key}'},
+                    data={
+                        'model': model,
+                        'response_format': 'text',
+                        'language': getattr(settings, 'TRANSCRIPTION_LANGUAGE', 'pt') or 'pt',
+                        'temperature': '0',
+                    },
+                    files={'file': (path.name, file_obj, 'application/octet-stream')},
+                    timeout=(30, 600),
+                )
+        except requests.RequestException as exc:
+            last_error = f'erro de rede: {exc}'
+            if attempt < attempts:
+                _sleep_before_retry(attempt)
+                continue
+            raise RuntimeError(f'API de transcrição indisponível após {attempts} tentativas: {last_error}') from exc
 
+        if response.status_code < 400:
+            text = _extract_transcription_text(response)
+            if not text:
+                raise RuntimeError('A API de transcrição retornou texto vazio.')
+            return text
+
+        body = (response.text or '').strip()
+        compact_body = re.sub(r'\s+', ' ', body)[:1000]
+        last_error = f'HTTP {response.status_code}: {compact_body}'
+
+        if response.status_code in retry_statuses and attempt < attempts:
+            _sleep_before_retry(attempt, response=response)
+            continue
+
+        if response.status_code == 401:
+            raise RuntimeError(
+                'API de transcrição retornou HTTP 401: chave inválida. '
+                'Confirme se GROQ_API_KEY no Render começa com gsk_ e foi salva sem espaços.'
+            )
+        if response.status_code == 413:
+            raise RuntimeError(
+                'API de transcrição retornou HTTP 413: arquivo/parte grande demais. '
+                'Reduza TRANSCRIPTION_CHUNK_SECONDS para 30 ou 45 no Render.'
+            )
+        raise RuntimeError(f'API de transcrição retornou {last_error}')
+
+    raise RuntimeError(f'API de transcrição falhou após {attempts} tentativas: {last_error}')
+
+
+def _extract_transcription_text(response: requests.Response) -> str:
     content_type = response.headers.get('content-type', '').lower()
     if 'application/json' in content_type:
         data = response.json()
-        text = data.get('text') or data.get('transcript') or ''
-    else:
-        text = response.text or ''
+        return (data.get('text') or data.get('transcript') or '').strip()
+    return (response.text or '').strip()
 
-    text = text.strip()
-    if not text:
-        raise RuntimeError('A API de transcrição retornou texto vazio.')
-    return text
+
+def _sleep_before_retry(attempt: int, *, response: requests.Response | None = None) -> None:
+    retry_after = None
+    if response is not None:
+        raw_retry_after = response.headers.get('retry-after')
+        if raw_retry_after:
+            try:
+                retry_after = float(raw_retry_after)
+            except ValueError:
+                retry_after = None
+    delay = retry_after if retry_after is not None else min(30.0, 2.0 * attempt)
+    time.sleep(delay)
 
 
 def _fallback_transcription(*, title: str, subject: str, area: str, error: str = '') -> str:

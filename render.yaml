@@ -18,7 +18,7 @@ services:
       - key: GROQ_MODEL
         value: llama-3.1-8b-instant
       - key: GROQ_TRANSCRIPTION_MODEL
-        value: whisper-large-v3
+        value: whisper-large-v3-turbo
       - key: TRANSCRIPTION_ALWAYS_CHUNK
         value: true
       - key: TRANSCRIPTION_LANGUAGE
@@ -29,6 +29,8 @@ services:
       - key: MAX_UPLOAD_MB
         value: 200
       - key: TRANSCRIPTION_CHUNK_SECONDS
-        value: 120
+        value: 45
       - key: TRANSCRIPTION_OVERLAP_SECONDS
         value: 5
+      - key: TRANSCRIPTION_RETRY_ATTEMPTS
+        value: 6
