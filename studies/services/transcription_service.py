@@ -97,6 +97,51 @@ def is_demo_transcription(text: str) -> bool:
     return bool(text and text.lstrip().startswith(FALLBACK_PREFIX))
 
 
+def _build_transcription_prompt(*, title: str = '', subject: str = '', area: str = '') -> str:
+    """Monta um contexto curto para o modelo de transcrição.
+
+    Importante: em modelos Whisper/Groq, o campo ``prompt`` deve ser usado como
+    contexto, não como resumo da aula. Por isso mantemos o texto curto e focado
+    em vocabulário provável. A transcrição continua sendo literal: o sistema não
+    deve resumir, completar nem inventar falas do professor.
+    """
+    title = (title or '').strip()
+    subject = (subject or '').strip()
+    area = (area or '').strip().lower()
+    configured_prompt = str(getattr(settings, 'TRANSCRIPTION_PROMPT', '') or '').strip()
+
+    context_parts: list[str] = []
+    if configured_prompt:
+        context_parts.append(configured_prompt)
+    if title:
+        context_parts.append(f'Título da aula: {title}.')
+    if subject:
+        context_parts.append(f'Matéria: {subject}.')
+
+    if area == 'direito':
+        context_parts.append(
+            'Contexto: aula jurídica em português do Brasil. Vocabulário provável: '
+            'Direito Civil, obrigações, solidariedade, devedor solidário, credor, '
+            'fiador, avalista, Código Civil, CDC, jurisprudência, artigo, parágrafo, '
+            'responsabilidade civil, obrigação solidária, subsidiária, execução, processo.'
+        )
+    elif area == 'medicina':
+        context_parts.append(
+            'Contexto: aula de Medicina em português do Brasil. Preserve termos técnicos, '
+            'nomes anatômicos, fisiologia, fisiopatologia, diagnóstico, conduta e tratamento.'
+        )
+    else:
+        context_parts.append('Contexto: aula em português do Brasil. Preserve a fala original do professor.')
+
+    context_parts.append(
+        'Transcreva somente o que foi falado no áudio, na ordem da aula. '
+        'Não crie resumo, não explique, não corrija o conteúdo e não adicione material que não esteja no áudio.'
+    )
+    prompt = ' '.join(part for part in context_parts if part).strip()
+    # Mantém o prompt pequeno para não consumir tokens nem prejudicar a transcrição.
+    return prompt[:900]
+
+
 def _transcribe_complete_with_configured_provider(uploaded_file, *, suffix: str, prompt: str = "") -> str:
     with tempfile.TemporaryDirectory(prefix='academeia_transcricao_') as temp_dir_name:
         temp_dir = Path(temp_dir_name)
