@@ -1,20 +1,39 @@
 {% extends 'app_base.html' %}
 {% block title %}Biblioteca — ACADEME.IA{% endblock %}
 {% block app_content %}
-<section class="page-head">
+<section class="page-head compact-page-head">
   <div>
     <p class="eyebrow">Biblioteca</p>
-    <h1>Todos os seus materiais organizados por área, matéria, tipo e pasta.</h1>
+    <h1>Materiais salvos</h1>
+    <p class="muted">Últimos três materiais em destaque, com filtros menores abaixo.</p>
   </div>
+</section>
+
+<section class="panel-card compact-filter-panel">
+  <div class="panel-header"><h2>Filtros</h2><span class="badge">{{ items.count }} item(ns)</span></div>
+  <form method="get" class="form-grid four compact-form">
+    {% for field in filter_form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
+    <button class="btn btn-secondary small" type="submit">Filtrar</button>
+  </form>
 </section>
 
 <div class="content-grid two-columns wide-left">
   <section class="panel-card">
-    <h2>Filtros</h2>
-    <form method="get" class="form-grid four">
-      {% for field in filter_form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
-      <button class="btn btn-secondary" type="submit">Filtrar</button>
-    </form>
+    <div class="panel-header"><h2>Últimos 3 materiais</h2><a href="#todos-materiais">Ver todos ↓</a></div>
+    {% if latest_items %}
+      <div class="card-list">
+      {% for item in latest_items %}
+        <div class="mini-card library-mini">
+          <a href="{% url 'studies:library_detail' item.id %}"><strong>{{ item.title }}</strong></a>
+          <span>{{ item.get_material_type_display }} · {{ item.subject|default:'Sem matéria' }} · {{ item.created_at|date:'d/m/Y' }}</span>
+          <form method="post" action="{% url 'studies:library_toggle_favorite' item.id %}" class="favorite-inline">
+            {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button class="favorite-star {% if item.favorite %}is-favorite{% endif %}" type="submit" title="Favoritar">★</button>
+          </form>
+        </div>
+      {% endfor %}
+      </div>
+    {% else %}<p class="muted">Nenhum material encontrado.</p>{% endif %}
   </section>
   <aside class="panel-card">
     <h2>Nova pasta</h2>
@@ -26,11 +45,9 @@
   </aside>
 </div>
 
-<section class="panel-card">
-  <div class="panel-header"><h2>Materiais salvos</h2><span class="badge">{{ items.count }} item(ns)</span></div>
-  {% if folders %}
-    <div class="folder-row">{% for folder in folders %}<span class="folder-chip">▤ {{ folder.name }}</span>{% endfor %}</div>
-  {% endif %}
+<section class="panel-card" id="todos-materiais">
+  <div class="panel-header"><h2>Todos os materiais</h2></div>
+  {% if folders %}<div class="folder-row">{% for folder in folders %}<span class="folder-chip">▤ {{ folder.name }}</span>{% endfor %}</div>{% endif %}
   {% if items %}
     <div class="table-wrap">
       <table class="modern-table">
@@ -38,22 +55,18 @@
         <tbody>
           {% for item in items %}
           <tr>
-            <td><a href="{% url 'studies:library_detail' item.id %}">{{ item.title }}</a>{% if item.favorite %} <span class="badge">Favorito</span>{% endif %}</td>
+            <td><a href="{% url 'studies:library_detail' item.id %}">{{ item.title }}</a></td>
             <td>{{ item.get_material_type_display }}</td>
             <td>{{ item.get_area_display }}</td>
             <td>{{ item.subject|default:'—' }}</td>
             <td>{{ item.created_at|date:'d/m/Y' }}</td>
-            <td class="table-actions">
-              <a href="{% url 'studies:library_detail' item.id %}">Visualizar</a>
+            <td class="table-actions compact-actions">
+              <a href="{% url 'studies:library_detail' item.id %}">Abrir</a>
               <a href="{% url 'studies:export_library_item' item.id 'pdf' %}">PDF</a>
               <a href="{% url 'studies:export_library_item' item.id 'docx' %}">Word</a>
               <a href="{% url 'studies:export_library_item' item.id 'txt' %}">TXT</a>
-              <form method="post" action="{% url 'studies:library_toggle_favorite' item.id %}">
-                {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit">★</button>
-              </form>
-              <form method="post" action="{% url 'studies:library_delete' item.id %}" onsubmit="return confirm('Excluir este item?')">
-                {% csrf_token %}<button type="submit">Excluir</button>
-              </form>
+              <form method="post" action="{% url 'studies:library_toggle_favorite' item.id %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="favorite-star {% if item.favorite %}is-favorite{% endif %}" type="submit">★</button></form>
+              <form method="post" action="{% url 'studies:library_delete' item.id %}" onsubmit="return confirm('Excluir este item?')">{% csrf_token %}<button type="submit">Excluir</button></form>
             </td>
           </tr>
           {% endfor %}

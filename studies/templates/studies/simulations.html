@@ -4,58 +4,37 @@
 <section class="page-head">
   <div>
     <p class="eyebrow">Simulados</p>
-    <h1>Monte simulados por área, assunto, quantidade e dificuldade.</h1>
+    <h1>Monte simulados com base nos documentos das aulas.</h1>
+    <p class="muted">Anexe PDF ou use materiais salvos para gerar questões online com gabarito comentado.</p>
   </div>
 </section>
 
 <div class="content-grid two-columns wide-left">
   <section class="panel-card">
-    <form method="post" data-loading-form>
+    <form method="post" enctype="multipart/form-data" data-loading-form>
       {% csrf_token %}
       <div class="form-grid two">
         {% for field in form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
       </div>
-      <button class="btn btn-primary" type="submit"><span class="spinner hidden"></span>Iniciar simulado</button>
+      <button class="btn btn-primary" type="submit"><span class="spinner hidden"></span>Montar simulado online</button>
     </form>
   </section>
-  <aside class="panel-card">
-    <h2>Resultados esperados</h2>
-    <div class="quick-tags vertical">
-      <span>Nota</span><span>Erros e acertos</span><span>Explicação</span><span>Temas para revisão</span><span>Exportação</span>
-    </div>
+  <aside class="panel-card compact-help">
+    <h2>Resultados interativos</h2>
+    <div class="quick-tags vertical small-tags"><span>Questões clicáveis</span><span>Acertos e erros</span><span>Nota automática</span><span>Gabarito comentado</span><span>Exportação</span></div>
   </aside>
 </div>
-
-{% if generated %}
-<section class="result-panel">
-  <div class="panel-header">
-    <h2>{{ exam.title }}</h2>
-    {% if library_item %}
-      <div class="export-actions">
-        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'docx' %}">Word</a>
-        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'pdf' %}">PDF</a>
-        <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'txt' %}">TXT</a>
-      </div>
-    {% endif %}
-  </div>
-  <div class="question-list">
-    {% for item in generated %}
-    <article class="question-card">
-      <h3>Questão {{ forloop.counter }}</h3>
-      <p>{{ item.statement }}</p>
-      {% if item.alternatives %}<ul>{% for alt in item.alternatives %}<li>{{ alt }}</li>{% endfor %}</ul>{% endif %}
-      <details><summary>Ver gabarito e explicação</summary><p><strong>Gabarito:</strong> {{ item.correct_answer }}</p><p>{{ item.explanation }}</p></details>
-    </article>
-    {% endfor %}
-  </div>
-</section>
-{% endif %}
 
 <section class="panel-card">
   <h2>Simulados recentes</h2>
   {% if exams %}
     <div class="card-list">
-      {% for item in exams %}<div class="mini-card"><strong>{{ item.title }}</strong><span>{{ item.subject }} · {{ item.created_at|date:'d/m/Y' }}</span></div>{% endfor %}
+      {% for item in exams %}
+      <a class="mini-card clickable" href="{% url 'studies:exam_detail' item.id %}">
+        <strong>{{ item.title }}</strong>
+        <span>{{ item.subject }} · Nota: {{ item.score }} · {{ item.created_at|date:'d/m/Y' }}</span>
+      </a>
+      {% endfor %}
     </div>
   {% else %}<p class="muted">Nenhum simulado criado ainda.</p>{% endif %}
 </section>

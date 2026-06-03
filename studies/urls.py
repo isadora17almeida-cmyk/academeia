@@ -18,5 +18,6 @@ urlpatterns = [
     path('flashcards/', views.flashcards, name='flashcards'),
     path('flashcards/<int:pk>/<str:result>/', views.review_flashcard, name='review_flashcard'),
     path('simulados/', views.simulations, name='simulations'),
+    path('simulados/<int:pk>/', views.exam_detail, name='exam_detail'),
     path('plano-de-estudos/', views.study_plan, name='study_plan'),
 ]

@@ -1,0 +1,43 @@
+{% extends 'app_base.html' %}
+{% block title %}{{ exam.title }} — Simulado — ACADEME.IA{% endblock %}
+{% block app_content %}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Simulado online</p>
+    <h1>{{ exam.title }}</h1>
+    <p>{{ exam.subject }} · {{ exam.get_difficulty_display }}</p>
+  </div>
+  <div class="head-actions"><a class="btn btn-secondary" href="{% url 'studies:simulations' %}">Voltar</a></div>
+</section>
+
+<section class="stats-grid flash-stats">
+  <article class="stat-card"><span>Respondidas</span><strong>{{ answered }}/{{ total }}</strong></article>
+  <article class="stat-card"><span>Acertos</span><strong>{{ correct }}</strong></article>
+  <article class="stat-card"><span>Erros</span><strong>{{ wrong }}</strong></article>
+  <article class="stat-card"><span>Nota</span><strong>{{ exam.score }}</strong></article>
+</section>
+
+<section class="result-panel">
+  <div class="question-list interactive-question-list">
+    {% for row in rows %}
+    <article class="question-card {% if row.answer %}{% if row.answer.is_correct %}answered-correct{% else %}answered-wrong{% endif %}{% endif %}">
+      <h3>Questão {{ forloop.counter }}</h3>
+      <p>{{ row.question.statement }}</p>
+      <form method="post" class="online-options server-options">
+        {% csrf_token %}
+        <input type="hidden" name="question_id" value="{{ row.question.id }}">
+        {% for alt in row.question.alternatives %}
+          <button type="submit" name="selected_answer" value="{{ alt|slice:':1' }}" {% if row.answer %}disabled{% endif %} class="{% if row.answer and row.correct_letter == alt|slice:':1' %}option-correct{% elif row.answer and row.answer.selected_answer == alt|slice:':1' and not row.answer.is_correct %}option-wrong{% endif %}">{{ alt }}</button>
+        {% endfor %}
+      </form>
+      {% if row.answer %}
+        <p class="answer-status {% if row.answer.is_correct %}ok{% else %}bad{% endif %}">{% if row.answer.is_correct %}Você acertou.{% else %}Você errou.{% endif %} Sua resposta: {{ row.answer.selected_answer }}</p>
+        <details class="commented-answer" open><summary>Gabarito comentado/corrigido</summary><p><strong>Gabarito:</strong> {{ row.question.correct_answer }}</p><p>{{ row.question.explanation }}</p></details>
+      {% else %}
+        <details class="commented-answer"><summary>Ver gabarito comentado</summary><p>Responda primeiro para conferir a correção.</p></details>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

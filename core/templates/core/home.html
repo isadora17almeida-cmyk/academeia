@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
-{% block title %}ACADEME.IA — IA para Direito e Medicina{% endblock %}
+{% load static %}
+{% block title %}ACADEME.IA — IA para todas as áreas de estudo{% endblock %}
 {% block body %}
 <header class="site-header glass">
-  <a class="brand" href="{% url 'core:home' %}"><span class="brand-mark">AI</span> ACADEME.IA</a>
+  <a class="brand" href="{% url 'core:home' %}"><span class="brand-logo-img"><img src="{% static 'images/logo-academeia.svg' %}" alt="ACADEME.IA"></span> ACADEME.IA</a>
   <button class="menu-toggle" data-menu-toggle>☰</button>
   <nav class="site-nav" data-menu>
     <a href="#inicio">Início</a>
     <a href="#recursos">Recursos</a>
-    <a href="#direito">Direito</a>
-    <a href="#medicina">Medicina</a>
+    <a href="#areas">Áreas</a>
     <a href="#transcricao">Transcrição</a>
     <a href="{% url 'studies:library' %}">Biblioteca</a>
     {% if user.is_authenticated %}
@@ -24,8 +24,8 @@
   <section class="hero section-pad">
     <div class="hero-copy reveal">
       <p class="eyebrow">Sua jornada acadêmica, potencializada por IA</p>
-      <h1>IA para estudantes de <span>Direito</span> e <span>Medicina</span></h1>
-      <p class="hero-text">Resuma conteúdos complexos, gere questões personalizadas e transcreva suas aulas com inteligência artificial. Estude com mais foco, profundidade e resultado.</p>
+      <h1>IA para estudantes de <span>todas as áreas</span></h1>
+      <p class="hero-text">Transforme aulas, PDFs, resumos e revisões em conhecimento organizado. Estude com IA em qualquer curso, com materiais, questões, flashcards, simulados e plano de estudos.</p>
       <div class="hero-actions">
         <a class="btn btn-primary" href="{% url 'accounts:register' %}">Começar agora</a>
         <a class="btn btn-secondary" href="#recursos">Ver recursos</a>
@@ -50,7 +50,7 @@
       <article class="feature-card reveal">
         <div class="icon">✦</div>
         <h3>Resumos Inteligentes</h3>
-        <p>Gere resumos completos e objetivos de livros, artigos, PDFs e assuntos digitados.</p>
+        <p>Gere resumos explicativos de PDFs, áudios, transcrições, livros, artigos e materiais digitados.</p>
         <a href="{% url 'studies:generate_summary' %}">Gerar resumo →</a>
       </article>
       <article class="feature-card reveal">
@@ -74,42 +74,42 @@
     </div>
   </section>
 
-  <section id="direito" class="split-section section-pad reveal">
+  <section id="areas" class="split-section section-pad reveal">
     <div>
-      <p class="eyebrow">Modo Direito</p>
-      <h2>Raciocínio jurídico estruturado para prova e prática</h2>
-      <p>Gere conceitos, fundamentos legais, princípios, doutrina resumida, jurisprudência, casos práticos, pegadinhas de prova e questões comentadas.</p>
+      <p class="eyebrow">Todas as áreas</p>
+      <h2>Estudo estruturado para qualquer curso, prova ou objetivo</h2>
+      <p>Use a plataforma para Direito, Medicina, Enfermagem, Psicologia, Administração, Engenharia, Pedagogia, Contabilidade e outros cursos.</p>
       <div class="quick-tags">
-        <span>Explicar artigo de lei</span><span>Caso prático</span><span>Questões OAB</span><span>Doutrina</span><span>Quadro comparativo</span>
+        <span>PDF + áudio</span><span>Questões online</span><span>Flashcards Anki</span><span>Simulados</span><span>Plano automático</span>
       </div>
     </div>
     <div class="glass-card list-card">
-      <h3>Exemplos de Direito</h3>
+      <h3>Exemplos de uso</h3>
       <ul>
-        <li>Obrigação de fazer no Direito Civil</li>
-        <li>Art. 247 do Código Civil</li>
-        <li>Direito Penal e tipicidade</li>
-        <li>Controle de constitucionalidade</li>
+        <li>Transcrever aula longa e gerar resumo avançado</li>
+        <li>Criar questões discursivas e objetivas</li>
+        <li>Gerar flashcards a partir de PDF</li>
+        <li>Montar simulados interativos</li>
       </ul>
     </div>
   </section>
 
-  <section id="medicina" class="split-section section-pad reveal">
+  <section id="organizacao" class="split-section section-pad reveal">
     <div class="glass-card list-card">
-      <h3>Exemplos de Medicina</h3>
+      <h3>Biblioteca pessoal</h3>
       <ul>
-        <li>Pâncreas para prova de anatomia</li>
-        <li>Caso clínico sobre diabetes</li>
-        <li>Fisiopatologia da inflamação</li>
-        <li>Farmacologia cardiovascular</li>
+        <li>Resumos salvos</li>
+        <li>Transcrições completas</li>
+        <li>Questões e simulados</li>
+        <li>Flashcards revisáveis</li>
       </ul>
     </div>
     <div>
-      <p class="eyebrow">Modo Medicina</p>
-      <h2>Integre anatomia, fisiologia, clínica e questões</h2>
-      <p>Crie resumos médicos com conceito, anatomia, fisiologia, fisiopatologia, diagnóstico, exames, tratamento, caso clínico e revisão para prova.</p>
+      <p class="eyebrow">Organização inteligente</p>
+      <h2>Uma biblioteca para revisar e medir evolução</h2>
+      <p>Salve tudo no PostgreSQL: resumos, transcrições, questões, flashcards, simulados, favoritos e plano de estudos.</p>
       <div class="quick-tags">
-        <span>Caso clínico</span><span>Resumo anatômico</span><span>Tabela comparativa</span><span>Questões de prova</span><span>Revisão rápida</span>
+        <span>Favoritos</span><span>Filtros</span><span>Exportação</span><span>Acertos e erros</span><span>Revisão rápida</span>
       </div>
     </div>
   </section>

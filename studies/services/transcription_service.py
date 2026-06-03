@@ -90,6 +90,10 @@ def extract_transcript_only(text: str) -> str:
         if pos > 0:
             cleaned = cleaned[:pos].strip()
 
+    # Remove marcações internas de chunk exibidas em versões anteriores.
+    cleaned = re.sub(r'\[Parte\s+\d+/\d+(?:\s+—[^\]]*)?\]\s*', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    cleaned = re.sub(r'[ \t]+', ' ', cleaned)
     return cleaned.strip()
 
 
@@ -322,7 +326,7 @@ def _transcribe_in_chunks(*, source_path: Path, temp_dir: Path, duration: float 
             ) from exc
         if chunk_text:
             start_second = _chunk_start_second(index, chunk_seconds, overlap_seconds)
-            parts.append(f'[Parte {index}/{total} — aprox. {math.floor(start_second / 60)} min]\n{chunk_text}')
+            parts.append(chunk_text)
 
     joined = '\n\n'.join(parts).strip()
     if not joined:

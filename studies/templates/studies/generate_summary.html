@@ -5,7 +5,8 @@
 <section class="page-head">
   <div>
     <p class="eyebrow">Gerar Resumo</p>
-    <h1>Transforme assuntos, PDFs e transcrições em material de estudo.</h1>
+    <h1>Transforme PDF, áudio longo e transcrição em material de estudo completo.</h1>
+    <p class="muted">No modo avançado, o sistema preserva exemplos do professor/orientador e explica cada exemplo para o aluno entender.</p>
   </div>
 </section>
 
@@ -17,13 +18,15 @@
       <div class="form-grid two">
         {% for field in form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
       </div>
-      <button class="btn btn-primary" type="submit"><span class="spinner hidden"></span>Gerar resumo</button>
+      <button class="btn btn-primary" type="submit"><span class="spinner hidden"></span>Gerar resumo explicativo</button>
+      <p class="muted small-note">Você pode anexar PDF e vários áudios da mesma aula. A transcrição dos áudios será usada como base do resumo.</p>
+      <div class="progress-bar fake-progress hidden" data-progress><span></span></div>
     </form>
   </section>
-  <aside class="panel-card">
-    <h2>Botões rápidos</h2>
-    <div class="quick-tags vertical">
-      <span>Explicar artigo de lei</span><span>Criar caso prático</span><span>Questões estilo OAB</span><span>Resumo anatômico</span><span>Caso clínico</span><span>Revisão de véspera</span>
+  <aside class="panel-card compact-help">
+    <h2>Resumo avançado inclui</h2>
+    <div class="quick-tags vertical small-tags">
+      <span>Conceitos explicados</span><span>Exemplos do professor</span><span>Explicação dos exemplos</span><span>Pontos de prova</span><span>Pegadinhas</span><span>Checklist de revisão</span>
     </div>
   </aside>
 </div>
@@ -31,7 +34,7 @@
 {% if result %}
 <section class="result-panel">
   <div class="panel-header">
-    <h2>Resultado gerado</h2>
+    <h2>Resumo gerado</h2>
     {% if library_item %}
       <div class="export-actions">
         <a class="btn btn-secondary small" href="{% url 'studies:export_library_item' library_item.id 'docx' %}">Word</a>
@@ -40,11 +43,9 @@
       </div>
     {% endif %}
   </div>
-  <div class="markdown-output">{{ result|simple_markdown }}</div>
+  <div class="markdown-output long-study-output">{{ result|simple_markdown }}</div>
   <div class="result-actions">
-    {% if library_item %}
-      <a class="btn btn-primary" href="{% url 'studies:library_detail' library_item.id %}">Abrir resumo salvo</a>
-    {% endif %}
+    {% if library_item %}<a class="btn btn-primary" href="{% url 'studies:library_detail' library_item.id %}">Abrir resumo salvo</a>{% endif %}
     <a class="btn btn-secondary" href="{% url 'studies:create_questions' %}">Gerar questões</a>
     <a class="btn btn-secondary" href="{% url 'studies:flashcards' %}">Gerar flashcards</a>
   </div>

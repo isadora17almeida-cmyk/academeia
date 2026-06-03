@@ -3,16 +3,15 @@
 <div class="app-shell" data-app-shell>
   {% include 'partials/sidebar.html' %}
   <main class="app-main">
-    <header class="app-topbar glass">
-      <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="Abrir ou recolher menu lateral">
-        <span></span><span></span><span></span>
-      </button>
+    {% if request.resolver_match.url_name == 'dashboard' %}
+    <header class="app-topbar glass dashboard-only-topbar">
       <div class="topbar-title">
         <strong>Área de estudos</strong>
-        <span>Organize aulas, resumos e revisões</span>
+        <span>Organize aulas, PDFs, questões, flashcards e simulados</span>
       </div>
       {% include 'partials/account_panel.html' %}
     </header>
+    {% endif %}
     {% include 'partials/messages.html' %}
     {% block app_content %}{% endblock %}
   </main>

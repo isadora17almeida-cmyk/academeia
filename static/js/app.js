@@ -75,3 +75,51 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
+// Interatividade das questões online geradas fora do simulado.
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('[data-question-card]').forEach((card) => {
+    card.querySelectorAll('[data-option]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const correct = (button.dataset.correct || '').trim().toUpperCase().slice(0, 1);
+        const chosen = (button.dataset.letter || '').trim().toUpperCase().slice(0, 1);
+        card.querySelectorAll('[data-option]').forEach((opt) => {
+          const letter = (opt.dataset.letter || '').trim().toUpperCase().slice(0, 1);
+          opt.classList.remove('option-correct', 'option-wrong');
+          if (correct && letter === correct) opt.classList.add('option-correct');
+        });
+        if (correct && chosen !== correct) button.classList.add('option-wrong');
+        const details = card.querySelector('.commented-answer');
+        if (details) details.open = true;
+      });
+    });
+  });
+
+  const course = document.querySelector('[data-course-select]');
+  const goal = document.querySelector('[data-objective-select]');
+  const objectiveMap = {
+    direito: ['OAB', 'Concursos públicos', 'Provas da faculdade', 'Carreira acadêmica', 'Residência jurídica', 'Outros'],
+    medicina: ['Provas da faculdade', 'Residência médica', 'Internato', 'Revisão clínica', 'Outros'],
+    enfermagem: ['Provas da faculdade', 'Concursos', 'Residência multiprofissional', 'Prática clínica', 'Outros'],
+    psicologia: ['Provas da faculdade', 'Concursos', 'Clínica', 'Pesquisa acadêmica', 'Outros'],
+    administracao: ['Provas da faculdade', 'Concursos', 'Certificações', 'Mercado de trabalho', 'Outros'],
+    engenharia: ['Provas da faculdade', 'Concursos', 'Projetos', 'Certificações', 'Outros'],
+    pedagogia: ['Provas da faculdade', 'Concursos', 'Prática docente', 'Pesquisa acadêmica', 'Outros'],
+    contabilidade: ['Provas da faculdade', 'CRC', 'Concursos', 'Mercado de trabalho', 'Outros'],
+    geral: ['Provas', 'Concursos', 'Revisão geral', 'Aprendizado contínuo', 'Outros'],
+    outros: ['Objetivo personalizado']
+  };
+  if (course && goal) {
+    course.addEventListener('change', () => {
+      const current = goal.value;
+      goal.innerHTML = '<option value="">Selecione um objetivo</option>';
+      (objectiveMap[course.value] || objectiveMap.geral).forEach((item) => {
+        const option = document.createElement('option');
+        option.value = item;
+        option.textContent = item;
+        if (item === current) option.selected = true;
+        goal.appendChild(option);
+      });
+    });
+  }
+});

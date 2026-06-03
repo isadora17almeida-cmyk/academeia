@@ -8,8 +8,14 @@ class Profile(models.Model):
     AREA_CHOICES = [
         ('direito', 'Direito'),
         ('medicina', 'Medicina'),
-        ('ambos', 'Ambos'),
+        ('enfermagem', 'Enfermagem'),
+        ('psicologia', 'Psicologia'),
+        ('administracao', 'Administração'),
+        ('engenharia', 'Engenharia'),
+        ('pedagogia', 'Pedagogia'),
+        ('contabilidade', 'Contabilidade'),
         ('geral', 'Geral'),
+        ('outros', 'Outros'),
     ]
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profile')

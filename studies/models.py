@@ -6,7 +6,14 @@ from django.utils import timezone
 class AreaChoices(models.TextChoices):
     DIREITO = 'direito', 'Direito'
     MEDICINA = 'medicina', 'Medicina'
+    ENFERMAGEM = 'enfermagem', 'Enfermagem'
+    PSICOLOGIA = 'psicologia', 'Psicologia'
+    ADMINISTRACAO = 'administracao', 'Administração'
+    ENGENHARIA = 'engenharia', 'Engenharia'
+    PEDAGOGIA = 'pedagogia', 'Pedagogia'
+    CONTABILIDADE = 'contabilidade', 'Contabilidade'
     GERAL = 'geral', 'Geral'
+    OUTROS = 'outros', 'Outros'
 
 
 class DifficultyChoices(models.TextChoices):

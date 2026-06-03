@@ -4,12 +4,13 @@
 <section class="page-head">
   <div>
     <p class="eyebrow">Criar Questões</p>
-    <h1>Gere questões com gabarito, explicação e dificuldade controlada.</h1>
+    <h1>Gere questões objetivas e discursivas com gabarito comentado.</h1>
+    <p class="muted">Use tema, PDF, transcrição ou material da biblioteca como base.</p>
   </div>
 </section>
 
 <section class="panel-card">
-  <form method="post" data-loading-form>
+  <form method="post" enctype="multipart/form-data" data-loading-form>
     {% csrf_token %}
     <div class="form-grid three">
       {% for field in form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
@@ -30,19 +31,29 @@
       </div>
     {% endif %}
   </div>
-  <div class="question-list">
+  <div class="question-list interactive-question-list">
     {% for item in generated %}
-      <article class="question-card">
+      <article class="question-card" data-question-card>
         <h3>Questão {{ forloop.counter }}</h3>
         <p>{{ item.statement }}</p>
-        {% if item.alternatives %}<ul>{% for alt in item.alternatives %}<li>{{ alt }}</li>{% endfor %}</ul>{% endif %}
-        {% if item.correct_answer %}<p><strong>Gabarito:</strong> {{ item.correct_answer }}</p>{% endif %}
-        {% if item.explanation %}<p><strong>Explicação:</strong> {{ item.explanation }}</p>{% endif %}
+        {% if item.alternatives %}
+          <div class="online-options">
+          {% for alt in item.alternatives %}
+            <button type="button" data-option data-correct="{{ item.correct_answer|slice:':1' }}" data-letter="{{ alt|slice:':1' }}">{{ alt }}</button>
+          {% endfor %}
+          </div>
+        {% endif %}
+        {% if item.correct_answer or item.explanation %}
+        <details class="commented-answer"><summary>Gabarito comentado/corrigido</summary>
+          {% if item.correct_answer %}<p><strong>Gabarito:</strong> {{ item.correct_answer }}</p>{% endif %}
+          {% if item.explanation %}<p><strong>Comentário:</strong> {{ item.explanation }}</p>{% endif %}
+        </details>
+        {% endif %}
       </article>
     {% endfor %}
   </div>
   <div class="result-actions">
-    <a class="btn btn-primary" href="{% url 'studies:simulations' %}">Transformar em simulado</a>
+    <a class="btn btn-primary" href="{% url 'studies:simulations' %}">Montar simulado</a>
     <a class="btn btn-secondary" href="{% url 'studies:library' %}">Abrir biblioteca</a>
   </div>
 </section>

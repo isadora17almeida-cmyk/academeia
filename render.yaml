@@ -40,5 +40,7 @@ services:
         value: 9000
       - key: SUMMARY_SOURCE_MAX_CHARS
         value: 9000
+      - key: SUMMARY_CHUNK_CHARS
+        value: 6500
       - key: SUMMARY_MAX_OUTPUT_TOKENS
-        value: 1200
+        value: 2200

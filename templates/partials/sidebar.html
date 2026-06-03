@@ -1,9 +1,13 @@
+{% load static %}
 <aside class="sidebar" data-sidebar>
-  <div class="sidebar-head">
+  <div class="sidebar-head sidebar-head-new">
     <a class="brand brand-sidebar" href="{% url 'studies:dashboard' %}">
-      <span class="brand-mark">AI</span>
+      <span class="brand-logo-img"><img src="{% static 'images/logo-academeia.svg' %}" alt="ACADEME.IA"></span>
       <span class="brand-text">ACADEME.IA</span>
     </a>
+    <button class="sidebar-toggle sidebar-toggle-inline" type="button" data-sidebar-toggle aria-label="Abrir ou recolher menu lateral">
+      <span></span><span></span><span></span>
+    </button>
   </div>
   <nav class="side-nav">
     <a href="{% url 'studies:dashboard' %}"><span class="nav-icon">▣</span><span class="nav-label">Dashboard</span></a>

@@ -1,15 +1,11 @@
 {% extends 'app_base.html' %}
 {% block title %}Dashboard — ACADEME.IA{% endblock %}
 {% block app_content %}
-<section class="page-head">
+<section class="page-head dashboard-welcome">
   <div>
     <p class="eyebrow">Dashboard</p>
     <h1>Olá, {{ request.user.first_name|default:request.user.username }}.</h1>
-    <p>Seu centro de comando para estudar com IA.</p>
-  </div>
-  <div class="head-actions">
-    <a class="btn btn-primary" href="{% url 'studies:generate_summary' %}">Novo resumo</a>
-    <a class="btn btn-secondary" href="{% url 'studies:transcriptions' %}">Transcrever aula</a>
+    <p>Visão geral dos seus estudos, materiais salvos e desempenho.</p>
   </div>
 </section>
 
@@ -27,45 +23,34 @@
     <h2>Progresso semanal</h2>
     <p>{{ weekly_count }} material(is) criado(s) nos últimos 7 dias.</p>
     <div class="progress-bar"><span style="width: {{ weekly_progress }}%"></span></div>
-    <div class="quick-actions">
-      <a href="{% url 'studies:create_questions' %}">Criar questões</a>
-      <a href="{% url 'studies:flashcards' %}">Gerar flashcards</a>
-      <a href="{% url 'studies:study_plan' %}">Plano de estudos</a>
+    <div class="quick-actions subtle-actions">
+      <a href="{% url 'studies:create_questions' %}">Questões</a>
+      <a href="{% url 'studies:flashcards' %}">Flashcards</a>
+      <a href="{% url 'studies:study_plan' %}">Plano</a>
     </div>
   </div>
   <div class="panel-card">
-    <h2>Matérias sugeridas</h2>
-    <div class="subject-columns">
-      <div><h3>Direito</h3>{% for item in direito_subjects %}<span class="badge">{{ item }}</span>{% endfor %}</div>
-      <div><h3>Medicina</h3>{% for item in medicina_subjects %}<span class="badge">{{ item }}</span>{% endfor %}</div>
-    </div>
+    <h2>Desempenho de flashcards</h2>
+    <p>Acertos: <strong>{{ flash_hits }}</strong> · Erros: <strong>{{ flash_misses }}</strong></p>
+    <p class="muted">Use os erros para gerar revisões e simulados focados.</p>
   </div>
 </section>
 
 <section class="panel-card">
-  <div class="panel-header">
-    <h2>Últimos materiais salvos</h2>
-    <a href="{% url 'studies:library' %}">Ver biblioteca →</a>
-  </div>
+  <div class="panel-header"><h2>Últimos materiais salvos</h2><a href="{% url 'studies:library' %}">Ver biblioteca →</a></div>
   {% if latest_items %}
-    <div class="table-wrap">
-      <table class="modern-table">
-        <thead><tr><th>Título</th><th>Tipo</th><th>Área</th><th>Matéria</th><th>Data</th></tr></thead>
-        <tbody>
-          {% for item in latest_items %}
-            <tr>
-              <td><a href="{% url 'studies:library_detail' item.id %}">{{ item.title }}</a></td>
-              <td>{{ item.get_material_type_display }}</td>
-              <td>{{ item.get_area_display }}</td>
-              <td>{{ item.subject|default:'—' }}</td>
-              <td>{{ item.created_at|date:'d/m/Y H:i' }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% else %}
-    <p class="muted">Nenhum material criado ainda. Comece gerando um resumo ou transcrevendo uma aula.</p>
-  {% endif %}
+    <div class="table-wrap"><table class="modern-table"><thead><tr><th>Título</th><th>Tipo</th><th>Área</th><th>Matéria</th><th>Data</th></tr></thead><tbody>
+      {% for item in latest_items %}<tr><td><a href="{% url 'studies:library_detail' item.id %}">{{ item.title }}</a></td><td>{{ item.get_material_type_display }}</td><td>{{ item.get_area_display }}</td><td>{{ item.subject|default:'—' }}</td><td>{{ item.created_at|date:'d/m/Y H:i' }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  {% else %}<p class="muted">Nenhum material criado ainda.</p>{% endif %}
+</section>
+
+<section class="panel-card muted-roadmap">
+  <h2>Áreas de estudo</h2>
+  <div class="subject-columns three-cols">
+    <div><h3>Direito</h3>{% for item in direito_subjects %}<span class="badge">{{ item }}</span>{% endfor %}</div>
+    <div><h3>Medicina</h3>{% for item in medicina_subjects %}<span class="badge">{{ item }}</span>{% endfor %}</div>
+    <div><h3>Geral</h3>{% for item in geral_subjects %}<span class="badge">{{ item }}</span>{% endfor %}</div>
+  </div>
 </section>
 {% endblock %}

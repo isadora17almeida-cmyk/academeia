@@ -3,6 +3,19 @@ from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
 from .models import Profile
 
+COURSE_OBJECTIVES = {
+    'direito': ['OAB', 'Concursos públicos', 'Provas da faculdade', 'Carreira acadêmica', 'Residência jurídica', 'Outros'],
+    'medicina': ['Provas da faculdade', 'Residência médica', 'Internato', 'Revisão clínica', 'Outros'],
+    'enfermagem': ['Provas da faculdade', 'Concursos', 'Residência multiprofissional', 'Prática clínica', 'Outros'],
+    'psicologia': ['Provas da faculdade', 'Concursos', 'Clínica', 'Pesquisa acadêmica', 'Outros'],
+    'administracao': ['Provas da faculdade', 'Concursos', 'Certificações', 'Mercado de trabalho', 'Outros'],
+    'engenharia': ['Provas da faculdade', 'Concursos', 'Projetos', 'Certificações', 'Outros'],
+    'pedagogia': ['Provas da faculdade', 'Concursos', 'Prática docente', 'Pesquisa acadêmica', 'Outros'],
+    'contabilidade': ['Provas da faculdade', 'CRC', 'Concursos', 'Mercado de trabalho', 'Outros'],
+    'geral': ['Provas', 'Concursos', 'Revisão geral', 'Aprendizado contínuo', 'Outros'],
+    'outros': ['Objetivo personalizado'],
+}
+
 
 class NeonAuthenticationForm(AuthenticationForm):
     username = forms.CharField(label='Usuário ou e-mail', widget=forms.TextInput(attrs={
@@ -28,7 +41,7 @@ class RegisterForm(UserCreationForm):
     email = forms.EmailField(label='E-mail', widget=forms.EmailInput(attrs={
         'class': 'form-control', 'placeholder': 'voce@email.com'
     }))
-    study_area = forms.ChoiceField(label='Área de interesse', choices=Profile.AREA_CHOICES[:3], widget=forms.Select(attrs={
+    study_area = forms.ChoiceField(label='Curso/área de estudo', choices=Profile.AREA_CHOICES, widget=forms.Select(attrs={
         'class': 'form-control'
     }))
     username = forms.CharField(label='Usuário', widget=forms.TextInput(attrs={
@@ -70,15 +83,18 @@ class ProfileForm(forms.ModelForm):
     first_name = forms.CharField(label='Nome', max_length=150, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
     last_name = forms.CharField(label='Sobrenome', max_length=150, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
     email = forms.EmailField(label='E-mail', widget=forms.EmailInput(attrs={'class': 'form-control'}))
+    academic_goal = forms.ChoiceField(label='Objetivo acadêmico', required=False, choices=[], widget=forms.Select(attrs={'class': 'form-control', 'data-objective-select': '1'}))
+    custom_goal = forms.CharField(label='Objetivo personalizado', required=False, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex.: prova específica, concurso, certificação...'}))
+    routine = forms.CharField(label='Rotina de estudos e trabalho', required=False, widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Ex.: trabalho 6h por dia, estudo 2h à noite, revisão aos sábados.'}))
 
     class Meta:
         model = Profile
         fields = ('full_name', 'study_area', 'college', 'objective', 'avatar')
         widgets = {
             'full_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'study_area': forms.Select(attrs={'class': 'form-control'}),
-            'college': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Opcional'}),
-            'objective': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex.: OAB, residência, prova da faculdade'}),
+            'study_area': forms.Select(attrs={'class': 'form-control', 'data-course-select': '1'}),
+            'college': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome da faculdade ou instituição'}),
+            'objective': forms.HiddenInput(),
             'avatar': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
         }
 
@@ -88,12 +104,30 @@ class ProfileForm(forms.ModelForm):
         self.fields['first_name'].initial = self.user.first_name
         self.fields['last_name'].initial = self.user.last_name
         self.fields['email'].initial = self.user.email
+        area = (self.data.get('study_area') if self.is_bound else None) or self.instance.study_area or 'geral'
+        choices = [(x, x) for x in COURSE_OBJECTIVES.get(area, COURSE_OBJECTIVES['geral'])]
+        self.fields['academic_goal'].choices = [('', 'Selecione um objetivo')] + choices
+        stored = self.instance.objective or ''
+        self.fields['routine'].initial = ''
+        if ' | Rotina: ' in stored:
+            goal, routine = stored.split(' | Rotina: ', 1)
+            self.fields['academic_goal'].initial = goal if goal in dict(choices) else 'Outros'
+            self.fields['custom_goal'].initial = '' if goal in dict(choices) else goal
+            self.fields['routine'].initial = routine
+        else:
+            self.fields['academic_goal'].initial = stored if stored in dict(choices) else ('Outros' if stored else '')
+            self.fields['custom_goal'].initial = '' if stored in dict(choices) else stored
 
     def save(self, commit=True):
         profile = super().save(commit=False)
         self.user.first_name = self.cleaned_data['first_name']
         self.user.last_name = self.cleaned_data['last_name']
         self.user.email = self.cleaned_data['email']
+        selected_goal = self.cleaned_data.get('academic_goal') or ''
+        custom_goal = self.cleaned_data.get('custom_goal') or ''
+        routine = self.cleaned_data.get('routine') or ''
+        final_goal = custom_goal if selected_goal in {'Outros', 'Objetivo personalizado'} or not selected_goal else selected_goal
+        profile.objective = (final_goal + (f' | Rotina: {routine}' if routine else ''))[:220]
         if commit:
             self.user.save()
             profile.save()

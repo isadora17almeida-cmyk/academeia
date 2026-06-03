@@ -8,65 +8,46 @@
     <h1>{{ transcript.title }}</h1>
     <p>{{ transcript.get_area_display }} · {{ transcript.subject|default:'Sem matéria' }} · {{ transcript.created_at|date:'d/m/Y H:i' }}</p>
   </div>
-  <div class="head-actions">
-    <a class="btn btn-secondary" href="{% url 'studies:transcriptions' %}">Voltar</a>
-  </div>
+  <div class="head-actions"><a class="btn btn-secondary" href="{% url 'studies:transcriptions' %}">Voltar</a></div>
 </section>
 
 <section class="result-panel">
-  <div class="panel-header">
-    <div>
-      <p class="eyebrow">Texto puro</p>
-      <h2>Transcrição do professor</h2>
-    </div>
-    <span class="badge-soft">Sem resumo</span>
-  </div>
-  {% if transcript.status == 'demonstrativa' %}
-    <div class="alert alert-error">Esta é uma transcrição demonstrativa, não a aula completa. Configure a chave de IA no arquivo <code>.env</code>. Para aulas longas, instale ffmpeg: <code>brew install ffmpeg</code>.</div>
-  {% endif %}
+  <div class="panel-header"><div><p class="eyebrow">Texto fiel</p><h2>Transcrição do professor</h2></div><span class="badge-soft">Sem marcação de partes</span></div>
   <p class="muted small-note">{{ transcript.transcript_only|length }} caracteres transcritos.</p>
   <div class="markdown-output transcript-only full-output">{{ transcript.transcript_only|simple_markdown }}</div>
 </section>
 
+{% if transcript.summary_text %}
+<section class="result-panel">
+  <div class="panel-header"><div><p class="eyebrow">Estudo guiado</p><h2>Resumo da aula</h2></div></div>
+  <div class="markdown-output long-study-output">{{ transcript.summary_text|simple_markdown }}</div>
+</section>
+{% endif %}
+
 {% if transcript.raw_text %}
 <section class="panel-card">
   <details class="raw-transcript-box">
-    <summary>Ver texto bruto retornado pela transcrição</summary>
-    <p class="muted small-note">Use esta área para conferir se algum trecho ficou fora da versão limpa.</p>
+    <summary>Ver texto bruto técnico</summary>
+    <p class="muted small-note">Área técnica para conferência. A transcrição principal acima já remove marcações internas.</p>
     <div class="markdown-output transcript-only full-output">{{ transcript.raw_text|simple_markdown }}</div>
   </details>
 </section>
 {% endif %}
 
-{% if transcript.summary_text %}
-<section class="result-panel">
-  <div class="panel-header">
-    <div>
-      <p class="eyebrow">Estudo guiado</p>
-      <h2>Resumo da aula</h2>
-    </div>
-  </div>
-  <div class="markdown-output">{{ transcript.summary_text|simple_markdown }}</div>
-</section>
-{% endif %}
-
 {% if transcript.topics_text %}
-<section class="result-panel">
-  <div class="panel-header"><h2>Tópicos organizados</h2></div>
-  <div class="markdown-output">{{ transcript.topics_text|simple_markdown }}</div>
-</section>
+<section class="result-panel"><div class="panel-header"><h2>Tópicos organizados</h2></div><div class="markdown-output">{{ transcript.topics_text|simple_markdown }}</div></section>
 {% endif %}
 
 <section class="panel-card">
   <h2>Ações</h2>
   <div class="result-actions wrap">
-    <a class="btn btn-primary" href="{% url 'studies:transcript_action' transcript.id 'resumo' %}">Salvar resumo na biblioteca</a>
+    <a class="btn btn-primary" href="{% url 'studies:transcript_action' transcript.id 'resumo' %}">Gerar resumo avançado</a>
     <a class="btn btn-secondary" href="{% url 'studies:transcript_action' transcript.id 'questoes' %}">Criar questões</a>
     <a class="btn btn-secondary" href="{% url 'studies:transcript_action' transcript.id 'flashcards' %}">Criar flashcards</a>
     <a class="btn btn-secondary" href="{% url 'studies:transcript_action' transcript.id 'topicos' %}">Separar por tópicos</a>
     <a class="btn btn-secondary" href="{% url 'studies:transcript_action' transcript.id 'corrigir' %}">Corrigir texto</a>
     <a class="btn btn-primary" href="{% url 'studies:transcript_action' transcript.id 'retranscrever' %}">Retranscrever aula completa</a>
-    <a class="btn btn-secondary" href="{% url 'studies:transcript_action' transcript.id 'reprocessar' %}">Restaurar texto bruto</a>
+    <a class="btn btn-secondary" href="{% url 'studies:transcript_action' transcript.id 'reprocessar' %}">Limpar texto bruto</a>
   </div>
 </section>
 {% endblock %}
