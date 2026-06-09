@@ -70,15 +70,59 @@ def _flashcards_to_markdown(cards: list[dict]) -> str:
 def _extract_pdf_text(uploaded_file) -> str:
     if not uploaded_file:
         return ''
+    name = (getattr(uploaded_file, 'name', '') or '').lower()
     try:
-        from PyPDF2 import PdfReader
         uploaded_file.seek(0)
+        if name.endswith('.txt'):
+            data = uploaded_file.read()
+            if isinstance(data, bytes):
+                text = data.decode('utf-8', errors='ignore')
+            else:
+                text = str(data)
+            uploaded_file.seek(0)
+            return text.strip()
+        from PyPDF2 import PdfReader
         reader = PdfReader(uploaded_file)
         text = '\n\n'.join(page.extract_text() or '' for page in reader.pages).strip()
         uploaded_file.seek(0)
         return text
     except Exception as exc:
-        return f'Não foi possível extrair o texto do PDF automaticamente. Erro: {exc}'
+        return f'Não foi possível extrair o texto do material automaticamente. Erro: {exc}'
+
+
+def _extract_many_pdf_text(uploaded_files) -> str:
+    parts: list[str] = []
+    for idx, uploaded in enumerate(uploaded_files or [], start=1):
+        name = getattr(uploaded, 'name', f'PDF {idx}')
+        parts.append(f'## Material {idx}: {name}\n' + _extract_pdf_text(uploaded))
+    return '\n\n'.join(part for part in parts if part.strip()).strip()
+
+
+def _transcribe_many_uploaded_files(uploaded_files, *, title: str, subject: str, area: str) -> tuple[str, str]:
+    """Transcreve vários arquivos em sequência e devolve texto bruto e fala limpa.
+
+    A divisão por arquivos fica apenas no texto bruto técnico. A fala do professor
+    salva/exibida é contínua, sem marcadores [Parte X/Y] nem cabeçalhos de arquivo.
+    """
+    raw_parts: list[str] = []
+    professor_parts: list[str] = []
+    files = list(uploaded_files or [])
+    total = len(files)
+    for idx, uploaded in enumerate(files, start=1):
+        name = getattr(uploaded, 'name', f'arquivo {idx}')
+        try:
+            try:
+                uploaded.seek(0)
+            except Exception:
+                pass
+            raw = transcribe_uploaded_file(uploaded, title=f'{title} — arquivo {idx}/{total}', subject=subject, area=area)
+            cleaned = extract_transcript_only(raw).strip()
+            raw_parts.append(f'## Arquivo {idx}/{total}: {name}\n{raw}')
+            if cleaned:
+                professor_parts.append(cleaned)
+        except Exception as exc:
+            raise RuntimeError(f'Falha ao transcrever o arquivo {idx}/{total} ({name}): {exc}') from exc
+    return '\n\n'.join(raw_parts).strip(), '\n\n'.join(professor_parts).strip()
 
 
 def _source_from_library_or_transcript(*, transcript=None, library_item=None) -> str:
@@ -89,12 +133,13 @@ def _source_from_library_or_transcript(*, transcript=None, library_item=None) ->
     return ''
 
 
-def _build_source_text_from_uploads(*, title: str, subject: str, area: str, input_text: str = '', pdf_file=None, audio_files=None) -> str:
+def _build_source_text_from_uploads(*, title: str, subject: str, area: str, input_text: str = '', pdf_files=None, audio_files=None) -> str:
     parts: list[str] = []
     if input_text:
         parts.append('## Texto/orientação informada\n' + input_text)
-    if pdf_file:
-        parts.append('## PDF/material da aula\n' + _extract_pdf_text(pdf_file))
+    pdf_text = _extract_many_pdf_text(pdf_files or [])
+    if pdf_text:
+        parts.append('## PDF(s)/material(is) da aula\n' + pdf_text)
     for idx, audio in enumerate(audio_files or [], start=1):
         try:
             raw = transcribe_uploaded_file(audio, title=f'{title} — áudio {idx}', subject=subject, area=area)
@@ -160,9 +205,9 @@ def generate_summary(request):
             data = form.cleaned_data
             source_text = data.get('input_text') or data['title']
             if data['source_type'] == 'pdf':
-                source_text = _extract_pdf_text(data['pdf_file'])
+                source_text = _extract_many_pdf_text(data.get('pdf_files') or [])
             elif data['source_type'] == 'pdf_audio':
-                source_text = _build_source_text_from_uploads(title=data['title'], subject=data.get('subject') or '', area=data['area'], input_text=data.get('input_text') or '', pdf_file=data.get('pdf_file'), audio_files=data.get('audio_files') or [])
+                source_text = _build_source_text_from_uploads(title=data['title'], subject=data.get('subject') or '', area=data['area'], input_text=data.get('input_text') or '', pdf_files=data.get('pdf_files') or [], audio_files=data.get('audio_files') or [])
             elif data['source_type'] == 'transcricao':
                 source_text = data['transcript'].best_text
             result = ai_generate_summary(area=data['area'], title=data['title'], subject=data.get('subject') or '', input_text=source_text, summary_type=data['summary_type'], level=data['level'])
@@ -186,8 +231,8 @@ def create_questions(request):
             data = form.cleaned_data
             source_text = data.get('source_text') or ''
             source_text += '\n\n' + _source_from_library_or_transcript(transcript=data.get('transcript'), library_item=data.get('library_item'))
-            if data.get('pdf_file'):
-                source_text += '\n\n' + _extract_pdf_text(data['pdf_file'])
+            if data.get('pdf_files'):
+                source_text += '\n\n' + _extract_many_pdf_text(data.get('pdf_files') or [])
             generated = ai_generate_questions(area=data['area'], subject=data['subject'], quantity=data['quantity'], difficulty=data['difficulty'], question_type=data['question_type'], include_answer=data['include_answer'], include_explanation=data['include_explanation'], source_text=source_text)
             first_question = None
             for idx, item in enumerate(generated, start=1):
@@ -210,19 +255,21 @@ def transcriptions(request):
         form = TranscriptForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
             data = form.cleaned_data
-            uploaded = data['file']
+            uploaded_files = data['files']
             try:
-                raw_text = transcribe_uploaded_file(uploaded, title=data['title'], subject=data.get('subject') or '', area=data['area'])
-                professor_text = _extract_transcript_only(raw_text)
+                raw_text, professor_text = _transcribe_many_uploaded_files(uploaded_files, title=data['title'], subject=data.get('subject') or '', area=data['area'])
                 status = 'demonstrativa' if is_demo_transcription(raw_text) else 'concluida'
-                summary_text = ai_generate_summary(area=data['area'], title=f"Resumo — {data['title']}", subject=data.get('subject') or '', input_text=professor_text, summary_type='completo', level='avancado')
-                try:
-                    uploaded.seek(0)
-                except Exception:
-                    pass
-                transcript = Transcript.objects.create(user=request.user, title=data['title'], area=data['area'], subject=data.get('subject') or '', source_file=uploaded, raw_text=raw_text, professor_text=professor_text, summary_text=summary_text, folder=data.get('folder'), status=status)
+                summary_title = f"Resumo — {data['title']}"
+                summary_text = ai_generate_summary(area=data['area'], title=summary_title, subject=data.get('subject') or '', input_text=professor_text, summary_type='completo', level='avancado')
+                first_file = uploaded_files[0] if uploaded_files else None
+                if first_file:
+                    try:
+                        first_file.seek(0)
+                    except Exception:
+                        pass
+                transcript = Transcript.objects.create(user=request.user, title=data['title'], area=data['area'], subject=data.get('subject') or '', source_file=first_file, raw_text=raw_text, professor_text=professor_text, summary_text=summary_text, folder=data.get('folder'), status=status)
                 _create_library_item(user=request.user, title=transcript.title, material_type='transcricao', area=transcript.area, subject=transcript.subject, content=transcript.transcript_only, folder=transcript.folder, object_id=transcript.id)
-                messages.success(request, 'Transcrição concluída. A fala do professor foi salva separada do resumo explicativo.')
+                messages.success(request, f'Transcrição concluída com {len(uploaded_files)} arquivo(s). A fala do professor foi salva separada do resumo explicativo.')
             except Exception as exc:
                 messages.error(request, f'Deu erro ao transcrever. Detalhe técnico: {exc}')
                 return redirect('studies:transcriptions')
@@ -392,8 +439,8 @@ def flashcards(request):
         if form.is_valid():
             data = form.cleaned_data
             source_text = data.get('source_text') or ''
-            if data.get('pdf_file'):
-                source_text += '\n\n' + _extract_pdf_text(data['pdf_file'])
+            if data.get('pdf_files'):
+                source_text += '\n\n' + _extract_many_pdf_text(data.get('pdf_files') or [])
             if data.get('library_item'):
                 source_text += '\n\n' + data['library_item'].content
             generated = ai_generate_flashcards(area=data['area'], subject=data['subject'], quantity=data['quantity'], difficulty=data['difficulty'], source_text=source_text)
@@ -435,8 +482,8 @@ def simulations(request):
         if form.is_valid():
             data = form.cleaned_data
             source_text = data.get('source_text') or ''
-            if data.get('pdf_file'):
-                source_text += '\n\n' + _extract_pdf_text(data['pdf_file'])
+            if data.get('pdf_files'):
+                source_text += '\n\n' + _extract_many_pdf_text(data.get('pdf_files') or [])
             if data.get('library_item'):
                 source_text += '\n\n' + data['library_item'].content
             generated = ai_generate_questions(area=data['area'], subject=data['subject'], quantity=data['quantity'], difficulty=data['difficulty'], question_type='multipla', include_answer=True, include_explanation=True, source_text=source_text)

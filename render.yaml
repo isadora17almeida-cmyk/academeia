@@ -26,6 +26,15 @@ services:
 
       - key: WEB_CONCURRENCY
         value: 1
+
+      - key: WEB_TIMEOUT
+        value: 3600
+      - key: WEB_GRACEFUL_TIMEOUT
+        value: 3600
+      - key: WEB_THREADS
+        value: 2
+      - key: MAX_REQUEST_BODY_MB
+        value: 250
       - key: MAX_UPLOAD_MB
         value: 200
       - key: TRANSCRIPTION_CHUNK_SECONDS

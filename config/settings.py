@@ -40,6 +40,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'config.middleware.MaxRequestBodySizeMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -119,9 +120,13 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
-MAX_UPLOAD_MB = int(os.getenv('MAX_UPLOAD_MB', '500'))
+MAX_UPLOAD_MB = int(os.getenv('MAX_UPLOAD_MB', '250'))
+MAX_TOTAL_UPLOAD_MB = int(os.getenv('MAX_TOTAL_UPLOAD_MB', str(MAX_UPLOAD_MB * 3)))
+MAX_REQUEST_BODY_MB = int(os.getenv('MAX_REQUEST_BODY_MB', str(MAX_UPLOAD_MB)))
 DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_MB * 1024 * 1024
-FILE_UPLOAD_MAX_MEMORY_SIZE = min(MAX_UPLOAD_MB, 25) * 1024 * 1024
+# Força uploads de arquivo para arquivo temporário, reduzindo uso de memória no Render.
+FILE_UPLOAD_HANDLERS = ['django.core.files.uploadhandler.TemporaryFileUploadHandler']
+FILE_UPLOAD_MAX_MEMORY_SIZE = 0
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')

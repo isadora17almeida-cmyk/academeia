@@ -1,4 +1,5 @@
 from django import forms
+from django.conf import settings
 from .models import AreaChoices, DifficultyChoices, Folder, Flashcard, LibraryItem, Question, StudyPlan, Summary, Transcript
 
 COMMON_ATTR = {'class': 'form-control'}
@@ -23,6 +24,34 @@ class MultipleFileField(forms.FileField):
         return [super(MultipleFileField, self).clean(item, initial) for item in data]
 
 
+
+
+def _validate_uploaded_file(uploaded, *, allowed_extensions: list[str], label: str = 'Arquivo'):
+    """Valida extensão e tamanho por arquivo, mantendo erro amigável na tela."""
+    name = (getattr(uploaded, 'name', '') or '').lower()
+    if not any(name.endswith(ext) for ext in allowed_extensions):
+        allowed_text = ', '.join(ext.upper().replace('.', '') for ext in allowed_extensions)
+        raise forms.ValidationError(f'{label} em formato não permitido. Use {allowed_text}.')
+    max_mb = int(getattr(settings, 'MAX_UPLOAD_MB', 250))
+    size = getattr(uploaded, 'size', 0) or 0
+    if size > max_mb * 1024 * 1024:
+        raise forms.ValidationError(f'{label} muito grande ({size / 1024 / 1024:.1f} MB). O limite por arquivo é {max_mb} MB.')
+    return uploaded
+
+
+def _validate_uploaded_files(files, *, allowed_extensions: list[str], label: str = 'Arquivo'):
+    files = list(files or [])
+    max_total_mb = int(getattr(settings, 'MAX_TOTAL_UPLOAD_MB', getattr(settings, 'MAX_UPLOAD_MB', 250)))
+    total_size = sum((getattr(item, 'size', 0) or 0) for item in files)
+    if total_size > max_total_mb * 1024 * 1024:
+        raise forms.ValidationError(f'O envio tem {total_size / 1024 / 1024:.1f} MB no total. O limite total atual é {max_total_mb} MB. Envie menos arquivos por vez ou comprima os arquivos.')
+    return [_validate_uploaded_file(item, allowed_extensions=allowed_extensions, label=f'{label} {idx}') for idx, item in enumerate(files, start=1)]
+
+
+PDF_EXTENSIONS = ['.pdf']
+AUDIO_VIDEO_TEXT_EXTENSIONS = ['.mp3', '.wav', '.m4a', '.mp4', '.aac', '.ogg', '.webm', '.mov', '.flac', '.txt']
+MATERIAL_EXTENSIONS = ['.pdf', '.txt']
+
 class SummaryForm(forms.Form):
     area = forms.ChoiceField(label='Área/curso', choices=AreaChoices.choices, widget=forms.Select(attrs=COMMON_ATTR))
     source_type = forms.ChoiceField(label='Tipo de conteúdo principal', choices=[
@@ -37,7 +66,7 @@ class SummaryForm(forms.Form):
     title = forms.CharField(label='Título', max_length=180, widget=forms.TextInput(attrs={**COMMON_ATTR, 'placeholder': 'Ex.: Aula 04 - Responsabilidade Civil'}))
     subject = forms.CharField(label='Matéria', max_length=140, required=False, widget=forms.TextInput(attrs={**COMMON_ATTR, 'placeholder': 'Ex.: Direito Civil, Anatomia, Administração'}))
     input_text = forms.CharField(label='Texto ou orientação adicional', required=False, widget=forms.Textarea(attrs={**COMMON_ATTR, 'rows': 6, 'placeholder': 'Cole conteúdo, roteiro, observações ou instruções específicas.'}))
-    pdf_file = forms.FileField(label='PDF/material da aula', required=False, widget=forms.FileInput(attrs={**COMMON_ATTR, 'accept': '.pdf'}))
+    pdf_files = MultipleFileField(label='PDF(s)/material(is) da aula', required=False, widget=MultipleFileInput(attrs={**COMMON_ATTR, 'accept': '.pdf', 'multiple': True}))
     audio_files = MultipleFileField(label='Áudio(s)/vídeo(s) da aula', required=False, widget=MultipleFileInput(attrs={**COMMON_ATTR, 'accept': '.mp3,.wav,.m4a,.mp4,.aac,.ogg,.webm,.mov,.flac,.txt', 'multiple': True}))
     transcript = forms.ModelChoiceField(label='Transcrição salva', queryset=Transcript.objects.none(), required=False, widget=forms.Select(attrs=COMMON_ATTR))
     folder = forms.ModelChoiceField(label='Pasta', queryset=Folder.objects.none(), required=False, widget=forms.Select(attrs=COMMON_ATTR))
@@ -52,15 +81,15 @@ class SummaryForm(forms.Form):
         cleaned = super().clean()
         source_type = cleaned.get('source_type')
         input_text = cleaned.get('input_text')
-        pdf_file = cleaned.get('pdf_file')
+        pdf_files = cleaned.get('pdf_files') or []
         audio_files = cleaned.get('audio_files') or []
         transcript = cleaned.get('transcript')
         title = cleaned.get('title')
         if source_type in ['assunto_digitado', 'texto_colado'] and not (input_text or title):
             raise forms.ValidationError('Digite um assunto ou cole um conteúdo para gerar o resumo.')
-        if source_type == 'pdf' and not pdf_file:
+        if source_type == 'pdf' and not pdf_files:
             raise forms.ValidationError('Envie um PDF para gerar o resumo.')
-        if source_type == 'pdf_audio' and not (pdf_file or audio_files or input_text):
+        if source_type == 'pdf_audio' and not (pdf_files or audio_files or input_text):
             raise forms.ValidationError('Envie pelo menos um PDF, áudio/vídeo ou texto base.')
         if source_type == 'transcricao' and not transcript:
             raise forms.ValidationError('Selecione uma transcrição salva.')
@@ -74,7 +103,7 @@ class QuestionGenerationForm(forms.Form):
     difficulty = forms.ChoiceField(label='Dificuldade', choices=DifficultyChoices.choices, widget=forms.Select(attrs=COMMON_ATTR))
     question_type = forms.ChoiceField(label='Tipo de questão', choices=Question.QUESTION_TYPES, widget=forms.Select(attrs=COMMON_ATTR))
     source_text = forms.CharField(label='Texto base opcional', required=False, widget=forms.Textarea(attrs={**COMMON_ATTR, 'rows': 5, 'placeholder': 'Cole resumo, transcrição ou conteúdo para usar como base.'}))
-    pdf_file = forms.FileField(label='PDF/material para base das questões', required=False, widget=forms.FileInput(attrs={**COMMON_ATTR, 'accept': '.pdf'}))
+    pdf_files = MultipleFileField(label='PDF(s)/material(is) para base das questões', required=False, widget=MultipleFileInput(attrs={**COMMON_ATTR, 'accept': '.pdf,.txt', 'multiple': True}))
     transcript = forms.ModelChoiceField(label='Transcrição salva', queryset=Transcript.objects.none(), required=False, widget=forms.Select(attrs=COMMON_ATTR))
     library_item = forms.ModelChoiceField(label='Material da biblioteca', queryset=LibraryItem.objects.none(), required=False, widget=forms.Select(attrs=COMMON_ATTR))
     include_answer = forms.BooleanField(label='Incluir gabarito', required=False, initial=True, widget=forms.CheckboxInput(attrs={'class': 'check-control'}))
@@ -93,7 +122,7 @@ class TranscriptForm(forms.Form):
     title = forms.CharField(label='Nome da aula', max_length=180, widget=forms.TextInput(attrs={**COMMON_ATTR, 'placeholder': 'Ex.: Aula 04 - Responsabilidade Civil'}))
     subject = forms.CharField(label='Matéria', max_length=140, required=False, widget=forms.TextInput(attrs={**COMMON_ATTR, 'placeholder': 'Ex.: Direito Civil, Anatomia'}))
     area = forms.ChoiceField(label='Área/curso', choices=AreaChoices.choices, widget=forms.Select(attrs=COMMON_ATTR))
-    file = forms.FileField(label='Arquivo de áudio ou vídeo', widget=forms.FileInput(attrs={**COMMON_ATTR, 'accept': '.mp3,.wav,.m4a,.mp4,.aac,.ogg,.webm,.mov,.flac,.txt'}))
+    files = MultipleFileField(label='Arquivo(s) de áudio, vídeo ou texto', widget=MultipleFileInput(attrs={**COMMON_ATTR, 'accept': '.mp3,.wav,.m4a,.mp4,.aac,.ogg,.webm,.mov,.flac,.txt', 'multiple': True}))
     folder = forms.ModelChoiceField(label='Pasta', queryset=Folder.objects.none(), required=False, widget=forms.Select(attrs=COMMON_ATTR))
 
     def __init__(self, *args, **kwargs):
@@ -101,13 +130,9 @@ class TranscriptForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields['folder'].queryset = Folder.objects.filter(user=user)
 
-    def clean_file(self):
-        uploaded = self.cleaned_data['file']
-        allowed = ['.mp3', '.wav', '.m4a', '.mp4', '.aac', '.ogg', '.webm', '.mov', '.flac', '.txt']
-        name = uploaded.name.lower()
-        if not any(name.endswith(ext) for ext in allowed):
-            raise forms.ValidationError('Formato não permitido. Use MP3, WAV, M4A, MP4, AAC, OGG, WEBM, MOV, FLAC ou TXT.')
-        return uploaded
+    def clean_files(self):
+        uploaded_files = self.cleaned_data.get('files') or []
+        return _validate_uploaded_files(uploaded_files, allowed_extensions=AUDIO_VIDEO_TEXT_EXTENSIONS, label='Arquivo')
 
 
 class FlashcardGenerationForm(forms.Form):
@@ -116,7 +141,7 @@ class FlashcardGenerationForm(forms.Form):
     quantity = forms.IntegerField(label='Quantidade', min_value=1, max_value=50, initial=10, widget=forms.NumberInput(attrs=COMMON_ATTR))
     difficulty = forms.ChoiceField(label='Dificuldade', choices=DifficultyChoices.choices, widget=forms.Select(attrs=COMMON_ATTR))
     source_text = forms.CharField(label='Resumo/transcrição opcional', required=False, widget=forms.Textarea(attrs={**COMMON_ATTR, 'rows': 6, 'placeholder': 'Cole um resumo ou transcrição para gerar flashcards precisos.'}))
-    pdf_file = forms.FileField(label='PDF da aula ou resumo', required=False, widget=forms.FileInput(attrs={**COMMON_ATTR, 'accept': '.pdf'}))
+    pdf_files = MultipleFileField(label='PDF(s) da aula ou resumo', required=False, widget=MultipleFileInput(attrs={**COMMON_ATTR, 'accept': '.pdf,.txt', 'multiple': True}))
     library_item = forms.ModelChoiceField(label='Material da biblioteca', queryset=LibraryItem.objects.none(), required=False, widget=forms.Select(attrs=COMMON_ATTR))
 
     def __init__(self, *args, **kwargs):
@@ -165,7 +190,7 @@ class ExamGenerationForm(forms.Form):
     quantity = forms.IntegerField(label='Quantidade de questões', min_value=1, max_value=50, initial=10, widget=forms.NumberInput(attrs=COMMON_ATTR))
     difficulty = forms.ChoiceField(label='Dificuldade', choices=DifficultyChoices.choices, widget=forms.Select(attrs=COMMON_ATTR))
     source_text = forms.CharField(label='Texto base opcional', required=False, widget=forms.Textarea(attrs={**COMMON_ATTR, 'rows': 5, 'placeholder': 'Cole transcrição, resumo ou material para basear o simulado.'}))
-    pdf_file = forms.FileField(label='PDF/documento da aula', required=False, widget=forms.FileInput(attrs={**COMMON_ATTR, 'accept': '.pdf'}))
+    pdf_files = MultipleFileField(label='PDF(s)/documento(s) da aula', required=False, widget=MultipleFileInput(attrs={**COMMON_ATTR, 'accept': '.pdf,.txt', 'multiple': True}))
     library_item = forms.ModelChoiceField(label='Material da biblioteca', queryset=LibraryItem.objects.none(), required=False, widget=forms.Select(attrs=COMMON_ATTR))
 
     def __init__(self, *args, **kwargs):

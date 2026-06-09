@@ -174,6 +174,8 @@ class Transcript(TimeStampedUserModel):
         return '\n\n'.join(parts)
 
 
+
+
 class Flashcard(TimeStampedUserModel):
     question = models.TextField()
     answer = models.TextField()

@@ -6,7 +6,7 @@
   <div>
     <p class="eyebrow">Transcrição de Aulas</p>
     <h1>Transcreva a fala do professor sem misturar com resumo.</h1>
-    <p class="muted">A divisão por partes continua interna, mas o texto exibido fica limpo e contínuo.</p>
+    <p class="muted">Você pode enviar um ou vários áudios/vídeos da mesma aula. O texto exibido fica limpo, contínuo e separado do resumo.</p>
   </div>
 </section>
 
@@ -15,14 +15,14 @@
     <form method="post" enctype="multipart/form-data" data-loading-form>
       {% csrf_token %}
       <div class="upload-box" data-upload-box>
-        <strong>Arraste seu arquivo aqui</strong>
-        <span>MP3, WAV, M4A, MP4, AAC, OGG, WEBM, MOV, FLAC ou TXT</span>
+        <strong>Arraste seus arquivos aqui</strong>
+        <span>MP3, WAV, M4A, MP4, AAC, OGG, WEBM, MOV, FLAC ou TXT — pode enviar vários</span>
       </div>
       <div class="form-grid two">
         {% for field in form %}{% include 'partials/form_field.html' with field=field %}{% endfor %}
       </div>
       <button class="btn btn-primary" type="submit"><span class="spinner hidden"></span>Iniciar transcrição completa</button>
-      <p class="muted small-note">Aulas longas podem demorar. O resultado terá a transcrição do professor e um resumo avançado separado.</p>
+      <p class="muted small-note">Você pode enviar vários arquivos da mesma aula. Aulas longas podem demorar. O resultado terá a transcrição do professor e um resumo avançado separado.</p>
       <div class="progress-bar fake-progress hidden" data-progress><span></span></div>
     </form>
   </section>
